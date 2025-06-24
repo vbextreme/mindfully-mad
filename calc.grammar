@@ -1,0 +1,29 @@
+{
+	"lexer": {
+		"matchMode"  : "first",
+		"unmatchMode": "error",
+		"rule": [{
+				"name" : "float",
+				"regex": "[0-9]+\\.[0-9]+"
+			},{
+				"name" : "number",
+				"regex": "[0-9]+"
+			},{
+				"name" : "operator",
+				"regex": "[+]"
+			},{
+				"name" : "space",
+				"regex": "[ \t]+",
+				"store": false
+			},{
+				"name" : "endCommand",
+				"regex": "\\n",
+				"notbegin": true
+			},{
+				"name" : "emptyLine",
+				"regex": "\\n",
+				"store": false
+			}
+		]
+	}
+}

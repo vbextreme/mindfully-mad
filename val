@@ -1,0 +1,8 @@
+#!/bin/bash
+cd build
+ninja clean
+ninja 
+
+valgrind --undef-value-errors=no --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=no --trace-syscalls=no --show-leak-kinds=definite,indirect,possible\
+	./mfm -g ../calc.grammar -s ../calc.src --dump-token
+
