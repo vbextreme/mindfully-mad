@@ -33,7 +33,7 @@ __private void mfm_die(const char* action, int errnum, const char* errstr, const
 	const char* beginLine    = extract_line(src, src+strlen(src), src+offerr, &endLine);
 	const unsigned offsetOut = fprintf(stderr, "%3zu | ", count_line_to(src, src+offerr));
 	unsigned ct              = count_tab(beginLine, endLine);
-	__free char* line = dup_line(beginLine, endLine);
+	__free char* line        = dup_line(beginLine, endLine);
 	fprintf(stderr, "%s\n", line);
 	unsigned sig = offerr - (beginLine-src);
 	sig = (sig-ct);

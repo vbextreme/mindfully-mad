@@ -4,13 +4,13 @@
 		"unmatchMode": "error",
 		"rule": [{
 				"name" : "float",
-				"regex": "[0-9]+\\.[0-9]+"
+				"regex": "[0-9]+\\.[0-9+]"
 			},{
 				"name" : "number",
 				"regex": "[0-9]+"
 			},{
 				"name" : "operator",
-				"regex": "[+]"
+				"regex": "[*+-]"
 			},{
 				"name" : "space",
 				"regex": "[ \t]+",
@@ -27,3 +27,6 @@
 		]
 	}
 }
+
+
+

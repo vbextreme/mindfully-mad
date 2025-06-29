@@ -13,10 +13,9 @@ typedef enum{
 option_s opt[] = {
 	{ 'g', "--grammar"   , "grammar file"         ,              OPT_PATH | OPT_EXISTS, 0, NULL},
 	{ 's', "--source"    , "source file"          ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ '0', "--dump-token", "dump generetion token",                          OPT_NOARG, 0, NULL},
+	{'\0', "--dump-token", "dump generetion token",                          OPT_NOARG, 0, NULL},
 	{ 'h', "--help"      , "display this"         ,                OPT_NOARG | OPT_END, 0, NULL},
 };
-
 
 int main(int argc, char** argv){
 	argv_parse(opt, argc, argv);
@@ -33,8 +32,8 @@ int main(int argc, char** argv){
 	
 	mforeach(opt[OPT_s].value, it){
 		mfm_clear(&mfm);
-		mfm_lexer_file(&mfm, opt[OPT_s].value[it].str);
 		printf("<%s>\n", opt[OPT_s].value[it].str);
+		mfm_lexer_file(&mfm, opt[OPT_s].value[it].str);
 		if( opt[OPT_dump_token].set ) mfm_token_dump(&mfm);
 	}
 	mfm_s_dtor(&mfm);

@@ -32,7 +32,7 @@ int lex_rule_add(lex_s* lex, char* name, char* regex, unsigned flags, unsigned* 
 	unsigned i = m_ipush(&lex->rules);
 	regex_ctor(&lex->rules[i].rex);
 	if( regex_build(&lex->rules[i].rex, regex) ){
-		*offerr = lex->rules[i].rex.erroff;
+		*offerr = lex->rules[i].rex.erroff+1;
 		*errstr = regex_err_str(&lex->rules[i].rex);
 		m_ipop(lex->rules);
 		return -1;
@@ -53,7 +53,7 @@ __private const char* rule_match(lexRule_s* rule, const char* txt, const char* e
 	}
 	regex_text(&rule->rex, txt, end-txt);
 	regex_match_delete(&rule->rex);
-	if( regex_match(&rule->rex) > 0 && regex_match_count(&rule->rex) > 0){
+	if( regex_match(&rule->rex) > 0 && regex_match_count(&rule->rex) > 0 ){
 		//dbg_info("rule: %s match", rule->name);
 		return regex_match_get(&rule->rex, 0, len);
 	}

@@ -4,7 +4,7 @@
 #
 #-S liburing linux-headers
 
-project('mfm', 'c', version: '0.0.0')
+project('mfm', 'c', version: '0.1.0')
 cc = meson.get_compiler('c')
 localPath = meson.current_source_dir()
 
@@ -13,7 +13,7 @@ type = 'executable'
 version = {
   'mmr': meson.project_version().split('.'),
   'str': meson.project_version(),
-  'dsc': 'resolve dependency, work in progress'
+  'dsc': ''
 }
 
 if get_option('eveloper')
@@ -52,6 +52,7 @@ src += [ 'notstd/extras.c' ]
 src += [ 'notstd/futex.c' ]
 src += [ 'notstd/threads.c' ]
 src += [ 'notstd/str.c' ]
+src += [ 'notstd/utf8.c' ]
 src += [ 'notstd/regex.c' ]
 src += [ 'notstd/opt.c' ]
 src += [ 'notstd/delay.c' ]
@@ -62,6 +63,7 @@ src += [ 'notstd/fzs.c' ]
 
 src += [ 'src/inutility.c' ]
 src += [ 'src/lexer.c' ]
+src += [ 'src/revm.c' ]
 src += [ 'src/mfm.c' ]
 src += [ 'src/mbi.c' ]
 
