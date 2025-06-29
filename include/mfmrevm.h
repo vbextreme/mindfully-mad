@@ -9,6 +9,9 @@ typedef struct revmMatch{
 	int match;
 }revmMatch_s;
 
+revmMatch_s revm_match(const utf8_t* txt, const uint16_t* bytecode);
+
+
 
 #endif
 

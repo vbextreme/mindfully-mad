@@ -224,6 +224,13 @@ special cmd
 256/8
 16
 
+TODO
+- unicode range
+- //m per lavorare in multilinea
+- //g per lavorare globalmente
+- /^/ che inizia con
+- /$/ che finisce con
+
 */
 
 #define BYTECODE_FORMAT   0xEE1A
@@ -302,7 +309,7 @@ __private int cmd_range(const uint16_t* bc, unsigned idr, utf8_t ch){
 	return bc[idr+im] & bm ? 1 : 0;
 }
 
-revmMatch_s revm_run(const utf8_t* txt, const uint16_t* bytecode){
+revmMatch_s revm_match(const utf8_t* txt, const uint16_t* bytecode){
 	revmMatch_s ret;
 	if( bytecode[0] != BYTECODE_FORMAT ) {
 		ret.match = -1;
