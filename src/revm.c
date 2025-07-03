@@ -1,10 +1,12 @@
-#include "notstd/utf8.h"
-#include <notstd/core.h>
-#include <notstd/str.h>
+#include <notstd/utf8.h>
 #include <notstd/memory.h>
 #include <mfmrevm.h>
 
 /*
+
+
+
+
 
 char   ch   ; if *str == ch
 range  id   ; check range id
@@ -212,15 +214,22 @@ bytecode:
 special cmd
 0xF 4bit cmd 8 bit value
 
+/^/ che inizia con : settare flags BEGIN con o senza MULTILINE
+/$/ che finisce con: basta mettere char 0 prima di match o char \n se multiline
+//G set vmgreedy otherwise classic thomson, lazy
+
 //header
 [0] 0xEE1A
-[1] range count
-[2] unicode count
-[3] start
-[4] bytecode len
+[1] flags
+[2] range count
+[3] unicode count
+[4] start
+[5] bytecode len
 //.section range
 [16 bytecode per range] * rengecount
-[256] * unicode count
+//.section urange
+[16 bytecode ascii]
+[512 bytecode range]: <count><empty><empty<empty> <2 bytecode start><2 bytecode end>
 
 /[a-z]/
 
@@ -228,11 +237,7 @@ special cmd
 16
 
 TODO
-- unicode range
-- //m per lavorare in multilinea
 - //g per lavorare globalmente con funzione esterna tipo revm_continue
-- /^/ che inizia con
-- /$/ che finisce con
 - test
 - creare comandi per creare un AST in maniera automatica tipo con CMD_NODE e forse CMD_TOKEN
 
@@ -240,33 +245,7 @@ TODO
 	dalla grammatica fare un lexer/parser direttamente in bytecode per implementare un compilatore reasm
 */
 
-#define BYTECODE_FORMAT   0xEE1A
-#define BYC_FORMAT        0
-#define BYC_RANGE_COUNT   1
-#define BYC_URANGE_COUNT  2
-#define BYC_START         3
-#define BYC_LEN           4
-#define BYC_SECTION_RANGE 5
-
-#define BYTECODE_CMD412(BYTECODE) ((BYTECODE)&0xF000)
-#define BYTECODE_VAL412(BYTECODE) ((BYTECODE)&0x0FFF)
-#define BYTECODE_VAL48(BYTECODE) ((BYTECODE)&0x00FF)
-
 #define MAX_CALL    256
-
-typedef enum{
-	CMD_MATCH  = 0x0000,
-	CMD_CHAR   = 0x1000,
-	CMD_UNICODE= 0x2000,
-	CMD_RANGE  = 0x3000,
-	CMD_URANGE = 0x4000,
-	CMD_SPLIT  = 0x5000,
-	CMD_SPLIR  = 0x6000,
-	CMD_JMP    = 0x7000,
-	CMD_SAVE   = 0x8000,
-	CMD_CALL   = 0x9000,
-	CMD_RET    = 0xA000
-}revmCmd_e;
 
 typedef struct revmThr{
 	unsigned      pc;
@@ -314,6 +293,10 @@ __private int pc_bitmap(uint8_t* pcbm, unsigned pc){
 	if( pcbm[il] & sb ) return 0;
 	pcbm[il] |= sb;
 	return 1;
+}
+
+__private void pc_bitmap_reset(revm_s* vm, uint16_t* bytecode){
+	memset(vm->pcBitmap, 0, bytecode[BYC_LEN]);
 }
 
 __private int vmthr_clone(revm_s* vm, unsigned tid, unsigned newpc){
@@ -371,8 +354,34 @@ __private int cmd_range(const uint16_t* bc, unsigned idr, utf8_t ch){
 	return bc[idr+im] & bm ? 1 : 0;
 }
 
+//very wrong implementation, ultra slow
+__private int cmd_urange(const uint16_t* bc,  unsigned idr, ucs4_t ch){
+	const unsigned offset = (BYC_SECTION_RANGE + bc[BYC_RANGE_COUNT] * 16) + (16+512)*idr;
+	bc = &bc[offset];
+	if( ch <= 128 ){
+		const unsigned im = ch & 0x0F;
+		const unsigned bm = 1 << (ch>>4);
+		return bc[im] & bm ? 1 : 0;
+	}
+	const unsigned count = bc[16];
+	bc += 4;
+	for( unsigned i = 0; i < count; ++i ){
+		ucs4_t rec = ((ucs4_t)bc[0]<<16) | bc[1];
+		if( ch < rec ) return 0;
+		rec = ((ucs4_t)bc[2]<<16) | bc[3];
+		if( ch < rec ) return 1;
+		bc += 4;
+	}
+	return 0;
+}
+
 revmMatch_s revm_match(const utf8_t* txt, const uint16_t* bytecode){
-	revmMatch_s ret;
+	revmMatch_s ret = {
+		.match = 0,
+		.capture[0] = txt,
+		.capture[1] = txt
+	};
+
 	if( bytecode[0] != BYTECODE_FORMAT ) {
 		ret.match = -1;
 		return ret;
@@ -400,7 +409,11 @@ revmMatch_s revm_match(const utf8_t* txt, const uint16_t* bytecode){
 	vm.allThreads[tid].pc = 0;
 	vm.runThreads[FAST_MOD_POW_TWO(vm.runw, vm.max)] = tid;
 	++vm.runw;
-	
+	const utf8_t* begin = txt;
+	const unsigned search    = bytecode[BYC_FLAGS] & BYTECODE_FLAG_BEGIN ? 0 : 1;
+	const unsigned multiline = bytecode[BYC_FLAGS] & BYTECODE_FLAG_MULTILINE;
+	const unsigned greedy    = bytecode[BYC_FLAGS] & BYTECODE_FLAG_GREEDY;
+
 	while( *txt ){
 		while( vm.runr != vm.runw ){
 			tid = vm.runThreads[FAST_MOD_POW_TWO(vm.runr, vm.max)];
@@ -411,6 +424,13 @@ revmMatch_s revm_match(const utf8_t* txt, const uint16_t* bytecode){
 			switch( cmd ){
 				case CMD_MATCH:
 					cmd_save(&vm, tid, 1, txt);
+					if( greedy ){
+						if( vm.allThreads[tid].save[1] - vm.allThreads[tid].save[0] > ret.capture[1] - ret.capture[0] ){
+							memcpy(ret.capture, vm.allThreads[tid].save, (vm.allThreads[tid].lastsave+1) * sizeof(uint8_t*));
+							ret.match = 1;
+						}
+						break;
+					}
 					memcpy(ret.capture, vm.allThreads[tid].save, (vm.allThreads[tid].lastsave+1) * sizeof(uint8_t*));
 					ret.match = 1;
 				return ret;
@@ -449,6 +469,13 @@ revmMatch_s revm_match(const utf8_t* txt, const uint16_t* bytecode){
 				break;
 				
 				case CMD_URANGE:
+					if( !cmd_range(bytecode, BYTECODE_CMD412(byc), *txt) ){
+						vmthr_release(&vm, tid);
+					}
+					else if( vmthr_idle(&vm, tid, pc+1) ){
+						ret.match = -2;
+						return ret;
+					}
 				break;
 				
 				case CMD_SPLIT:
@@ -520,12 +547,235 @@ revmMatch_s revm_match(const utf8_t* txt, const uint16_t* bytecode){
 		vm.idler = 0;
 		vm.idlew = 0;
 		swap(vm.runThreads, vm.idleThreads);
-		txt = utf8_codepoint_next(txt);
+		
+		if( vm.runr == vm.runw ){
+			if( search ){
+				if( multiline ){
+					if( *begin != '\n' ) begin = (const utf8_t*)strchrnul((const char*)begin, '\n');
+					if( *begin ) ++begin;
+				}
+				else{
+					begin = utf8_codepoint_next(begin);
+				}
+				txt = begin;
+				unsigned tid = vmthr_new(&vm);
+				vm.allThreads[tid].pc = 0;
+				vm.runThreads[FAST_MOD_POW_TWO(vm.runw, vm.max)] = tid;
+				++vm.runw;
+			}
+			else{
+				break;
+			}
+		}
+		else{
+			txt = utf8_codepoint_next(txt);
+		}
+		
 	}//loop txt
 	
-	ret.match   = 0;
 	return ret;
 }
+
+
+
+/*
+
+regex vm stack based
+
+
+000000000 00000000 00000000 00000000
+
+
+
+*/
+
+
+typedef struct revmStack{
+	unsigned      pc;
+	const utf8_t* txt;
+	unsigned      ssp;
+	unsigned      csp;
+}revmStack_s;
+
+typedef struct revmCapture{
+	const utf8_t* start;
+	const utf8_t* end;
+}revmCapture_s;
+
+typedef struct revm2{
+	uint16_t*      bytecode;
+	uint16_t*      fn;
+	uint16_t*      range;
+	revmStack_s*   stack;
+	revmCapture_s* capture;
+	unsigned*      cstk;
+	const utf8_t*  txt;
+	uint32_t       start;
+	uint32_t       pc;
+}revm2_s;
+
+__private void stk_push(revm2_s* vm, unsigned pc, const utf8_t* txt){
+	unsigned i = m_ipush(&vm->stack);
+	vm->stack[i].pc  = pc;
+	vm->stack[i].txt = txt;
+	vm->stack[i].ssp = m_header(vm->capture)->len;
+	vm->stack[i].csp = m_header(vm->cstk)->len;
+}
+
+__private int stk_pop(revm2_s* vm){
+	long i = m_ipop(vm->stack);
+	if( i < 0 ) return 0;
+	vm->pc  = vm->stack[i].pc;
+	vm->txt = vm->stack[i].txt;
+	m_header(vm->capture)->len = vm->stack[i].ssp;
+	m_header(vm->cstk)->len = vm->stack[i].csp;
+	return 1;
+}
+
+__private int range(revm2_s* vm, unsigned ir, utf8_t ch){
+	const unsigned im = ch & 0x0F;
+	const unsigned bm = 1 << (ch>>4);
+	return vm->range[ir+im] & bm;
+}
+
+__private void capture_begin(revm2_s* vm){
+	unsigned i = m_ipush(&vm->capture);
+	vm->capture[i].start = vm->txt;
+	vm->capture[i].end   = NULL;
+}
+
+__private void capture_end(revm2_s* vm){
+	unsigned i = m_header(vm->capture)->len;
+	iassert(i);
+	iassert(vm->capture[i].end == NULL);
+	vm->capture[i].end = vm->txt;
+}
+
+__private int capture_check(revm2_s* vm){
+	mforeach(vm->capture,i){
+		if( !vm->capture[i].end ) return 0;
+	}
+	return 1;
+}
+
+__private void call(revm2_s* vm, unsigned ifn){
+	stk_push(vm, vm->start + vm->fn[ifn], vm->txt);
+	unsigned i = m_ipush(&vm->cstk);
+	vm->cstk[i] = vm->pc+1;
+}
+
+__private void ret(revm2_s* vm){
+	long i = m_ipop(vm->cstk);
+	iassert(i >= 0);
+	stk_push(vm, vm->cstk[i], vm->txt);
+}
+
+__private void revm2_dtor(revm2_s* vm){
+	m_free(vm->capture);
+	m_free(vm->stack);
+	m_free(vm->cstk);
+}
+
+revmCapture_s* revm_match2(uint16_t* bytecode, const utf8_t* txt){
+	revm2_s vm;
+	vm.bytecode = bytecode;
+	vm.fn       = &bytecode[bytecode[BYC_SECTION_FN]];
+	vm.range    = &bytecode[bytecode[BYC_SECTION_RANGE]];
+	vm.pc       = 0;
+	vm.stack    = MANY(revmStack_s, bytecode[BYC_LEN]);
+	vm.capture  = MANY(revmCapture_s, 64);
+	vm.cstk     = MANY(unsigned, 128);
+	vm.start    = bytecode[BYC_START];
+
+	stk_push(&vm, vm.start, txt);
+	
+	while( stk_pop(&vm) ){
+		const unsigned byc = bytecode[vm.pc];
+		const unsigned cmd = BYTECODE_CMD412(byc);
+		switch( cmd ){
+			case OP_MATCH:
+				iassert(capture_check(&vm));
+				revm2_dtor(&vm);
+			return m_borrowed(vm.capture);
+			
+			case OP_CHAR:
+				if( *txt == BYTECODE_VAL48(byc) ) stk_push(&vm, vm.pc+1, txt+1);
+			break;
+			
+			case OP_RANGE:
+				if( range(&vm, BYTECODE_VAL412(byc), *vm.txt) ) stk_push(&vm, vm.pc+1, txt+1);
+			break;
+			
+			case OP_URANGE:
+				//TODO
+			break;
+			
+			case OP_SPLITF:
+				stk_push(&vm, vm.pc + BYTECODE_VAL412(byc), txt);
+				stk_push(&vm, vm.pc+1, txt);
+			break;
+			
+			case OP_SPLITB:
+				stk_push(&vm, vm.pc - BYTECODE_VAL412(byc), txt);
+				stk_push(&vm, vm.pc+1, txt);
+			break;
+			
+			case OP_SPLIRF:
+				stk_push(&vm, vm.pc+1, txt);
+				stk_push(&vm, vm.pc + BYTECODE_VAL412(byc), txt);
+			break;
+			
+			case OP_SPLIRB:
+				stk_push(&vm, vm.pc+1, txt);
+				stk_push(&vm, vm.pc - BYTECODE_VAL412(byc), txt);
+			break;
+			
+			case OP_JMPF:
+				stk_push(&vm, vm.pc + BYTECODE_VAL412(byc), txt);
+			break;
+			
+			case OP_JMPB:
+				stk_push(&vm, vm.pc - BYTECODE_VAL412(byc), txt);
+			break;
+			
+			case OP_SAVEB:
+				capture_begin(&vm);
+			break;
+			
+			case OP_SAVEE:
+				capture_end(&vm);
+			break;
+			
+			case OP_CALL:
+				call(&vm, BYTECODE_CMD412(byc));
+			break;
+
+			case OP_RET:
+				ret(&vm);
+			break;
+		}
+	}
+	
+	revm2_dtor(&vm);
+	return NULL;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
