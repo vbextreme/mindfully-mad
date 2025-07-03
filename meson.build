@@ -4,7 +4,7 @@
 #
 #-S liburing linux-headers
 
-project('mfm', 'c', version: '0.1.0')
+project('mfm', 'c', version: '0.2.0')
 cc = meson.get_compiler('c')
 localPath = meson.current_source_dir()
 
@@ -13,7 +13,7 @@ type = 'executable'
 version = {
   'mmr': meson.project_version().split('.'),
   'str': meson.project_version(),
-  'dsc': ''
+  'dsc': 'switch thomson vm to stack vm'
 }
 
 if get_option('eveloper')
@@ -64,6 +64,7 @@ src += [ 'notstd/fzs.c' ]
 src += [ 'src/inutility.c' ]
 src += [ 'src/lexer.c' ]
 src += [ 'src/revm.c' ]
+src += [ 'src/recom.c' ]
 src += [ 'src/mfm.c' ]
 src += [ 'src/mbi.c' ]
 
