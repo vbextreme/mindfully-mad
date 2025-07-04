@@ -1,6 +1,7 @@
 #include <notstd/utf8.h>
 #include <notstd/memory.h>
 #include <mfmrevm.h>
+#include <readline/readline.h>
 
 /*
 
@@ -260,7 +261,7 @@ typedef struct revmStack{
 	unsigned      np;
 }revmStack_s;
 
-typedef struct revm2{
+typedef struct revm{
 	uint16_t*      bytecode;
 	uint16_t*      fn;
 	uint16_t*      range;
@@ -317,7 +318,7 @@ __private void cret(revm_s* vm){
 	if( i>= 0 ) stk_push(vm, vm->cstk[i], vm->sp);
 }
 
-__private void revm2_dtor(revm_s* vm){
+__private void revm_dtor(revm_s* vm){
 	m_free(vm->stack);
 	m_free(vm->cstk);
 	m_free(vm->node);
@@ -328,6 +329,94 @@ __private void node(revm_s* vm, nodeOP_e op, unsigned id){
 	vm->node[i].sp = vm->sp;
 	vm->node[i].id = id;
 	vm->node[i].op = op;
+}
+
+__private int vm_exec(revm_s* vm, revmMatch_s* ret){
+	const unsigned byc = vm->bytecode[vm->pc];
+	switch( BYTECODE_CMD40(byc) ){
+		case OP_MATCH:
+			save(vm, 1);
+			memcpy(ret->capture, vm->save, sizeof(const utf8_t*) * (vm->ls+1));
+			ret->match = (vm->ls+1)/2;
+			ret->node  = m_borrowed(vm->node);
+			revm_dtor(vm);
+		return 0;
+		
+		case OP_CHAR:
+			if( *vm->sp == BYTECODE_VAL08(byc) ){
+				stk_push(vm, vm->pc+1, vm->sp+1);
+			}
+			else{
+				cret(vm);
+			}
+		break;
+		
+		case OP_RANGE:
+			if( range(vm, BYTECODE_VAL12(byc), *vm->sp) ){
+				stk_push(vm, vm->pc+1, vm->sp+1);
+			}
+			else{
+				cret(vm);
+			}
+		break;
+		
+		case OP_URANGE:
+			//TODO
+		break;
+		
+		case OP_SPLITF:
+			stk_push(vm, vm->pc + BYTECODE_VAL12(byc), vm->sp);
+			stk_push(vm, vm->pc+1, vm->sp);
+		break;
+		
+		case OP_SPLITB:
+			stk_push(vm, vm->pc - BYTECODE_VAL12(byc), vm->sp);
+			stk_push(vm, vm->pc+1, vm->sp);
+		break;
+		
+		case OP_SPLIRF:
+			stk_push(vm, vm->pc+1, vm->sp);
+			stk_push(vm, vm->pc + BYTECODE_VAL12(byc), vm->sp);
+		break;
+		
+		case OP_SPLIRB:
+			stk_push(vm, vm->pc+1, vm->sp);
+			stk_push(vm, vm->pc - BYTECODE_VAL12(byc), vm->sp);
+		break;
+		
+		case OP_JMPF:
+			stk_push(vm, vm->pc + BYTECODE_VAL12(byc), vm->sp);
+		break;
+		
+		case OP_JMPB:
+			stk_push(vm, vm->pc - BYTECODE_VAL12(byc), vm->sp);
+		break;
+		
+		case OP_NODE:
+			node(vm, NOP_NEW, BYTECODE_VAL12(byc));
+		break;
+		
+		case OP_CALL:
+			call(vm, BYTECODE_CMD40(byc));
+		break;
+		
+		case OP_EXT:
+			switch(BYTECODE_CMD04(byc)){
+				case OPE_SAVE:
+					save(vm, BYTECODE_VAL08(byc));
+				break;
+				
+				case OPE_RET:
+					cret(vm);
+				break;
+				
+				case OPE_PARENT:
+					node(vm, NOP_PARENT, 0);
+				break;
+			}
+		break;
+	}
+	return -1;
 }
 
 revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt){
@@ -345,97 +434,79 @@ revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt){
 	vm.sp       = txt;
 	
 	stk_push(&vm, vm.start, vm.sp);
-	
-	while( stk_pop(&vm) ){
-		const unsigned byc = bytecode[vm.pc];
-		switch( BYTECODE_CMD40(byc) ){
-			case OP_MATCH:
-				save(&vm, 1);
-				memcpy(ret.capture, vm.save, sizeof(const utf8_t*) * (vm.ls+1));
-				ret.match = (vm.ls+1)/2;
-				ret.node  = m_borrowed(vm.node);
-				revm2_dtor(&vm);
-			return ret;
-			
-			case OP_CHAR:
-				if( *vm.sp == BYTECODE_VAL08(byc) ){
-					stk_push(&vm, vm.pc+1, vm.sp+1);
-				}
-				else{
-					cret(&vm);
-				}
-			break;
-			
-			case OP_RANGE:
-				if( range(&vm, BYTECODE_VAL12(byc), *vm.sp) ){
-					stk_push(&vm, vm.pc+1, vm.sp+1);
-				}
-				else{
-					cret(&vm);
-				}
-			break;
-			
-			case OP_URANGE:
-				//TODO
-			break;
-			
-			case OP_SPLITF:
-				stk_push(&vm, vm.pc + BYTECODE_VAL12(byc), vm.sp);
-				stk_push(&vm, vm.pc+1, vm.sp);
-			break;
-			
-			case OP_SPLITB:
-				stk_push(&vm, vm.pc - BYTECODE_VAL12(byc), vm.sp);
-				stk_push(&vm, vm.pc+1, vm.sp);
-			break;
-			
-			case OP_SPLIRF:
-				stk_push(&vm, vm.pc+1, vm.sp);
-				stk_push(&vm, vm.pc + BYTECODE_VAL12(byc), vm.sp);
-			break;
-			
-			case OP_SPLIRB:
-				stk_push(&vm, vm.pc+1, txt);
-				stk_push(&vm, vm.pc - BYTECODE_VAL12(byc), vm.sp);
-			break;
-			
-			case OP_JMPF:
-				stk_push(&vm, vm.pc + BYTECODE_VAL12(byc), vm.sp);
-			break;
-			
-			case OP_JMPB:
-				stk_push(&vm, vm.pc - BYTECODE_VAL12(byc), vm.sp);
-			break;
-			
-			case OP_NODE:
-				node(&vm, NOP_NEW, BYTECODE_VAL12(byc));
-			break;
-			
-			case OP_CALL:
-				call(&vm, BYTECODE_CMD40(byc));
-			break;
-			
-			case OP_EXT:
-				switch(BYTECODE_CMD04(byc)){
-					case OPE_SAVE:
-						save(&vm, BYTECODE_VAL08(byc));
-					break;
-					
-					case OPE_RET:
-						cret(&vm);
-					break;
-					
-					case OPE_PARENT:
-						node(&vm, NOP_PARENT, 0);
-					break;
-				}
-			break;
-		}
-	}
-	
-	revm2_dtor(&vm);
+	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
+	revm_dtor(&vm);
 	return ret;
 }
+
+__private void term_cls(void){
+	fputs("\033[2J\033[H", stdout);
+}
+
+__private void term_gotoxy(unsigned x, unsigned y){
+	printf("\033[%d;%dH", x+1, y+1);
+}
+
+__private void term_fcol(unsigned col){
+	printf("\033[38;5;%umm", col);
+}
+
+__private void term_bcol(unsigned col){
+	printf("\033[48;5;%um", col);
+}
+
+__private void term_reset(void){
+	printf("\033[m");
+}
+
+__private void term_bold(void){
+	printf("\033[1m");
+}
+
+
+/*
+	start:
+
+	stack     |    node |  fname  | range
+	1         | 1       | 1       | 1
+	2         | 2       | 2       | 2
+	3         | 3       | 3       | 3
+    -------------------------------------------
+	command
+	1
+	2
+	3
+	4
+	5
+	
+	>
+
+*/
+void revm_debug(uint16_t* bytecode, const utf8_t* txt){
+	
+	
+	
+	
+	
+	return;
+	revmMatch_s ret = {.match = 0, .node = NULL};
+	
+	revm_s vm;
+	vm.bytecode = bytecode;
+	vm.fn       = &bytecode[bytecode[BYC_SECTION_FN]];
+	vm.range    = &bytecode[bytecode[BYC_SECTION_RANGE]];
+	vm.pc       = 0;
+	vm.stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
+	vm.cstk     = MANY(unsigned, 128);
+	vm.node     = MANY(bcnode_s, 32);
+	vm.start    = bytecode[BYC_START];
+	vm.sp       = txt;
+	
+	stk_push(&vm, vm.start, vm.sp);
+	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
+	revm_dtor(&vm);
+}
+
 
 
 

@@ -16,6 +16,7 @@ recom_s* recom_ctor(recom_s* rc){
 	recom_range_ctor(&any);
 	recom_range_set(&any, 0);
 	recom_range_reverse(&any);
+	recom_label_new(rc);
 	return rc;
 }
 
@@ -180,19 +181,17 @@ recom_s* recom_parent(recom_s* rc){
 }
 
 recom_s* recom_start(recom_s* rc, int search){
-	unsigned start = recom_label_new(rc);
-	iassert(start == 0);
 	if( search ){
 		//.*?
 		unsigned next   = recom_label_new(rc);
-		recom_label(rc, start);
+		recom_label(rc, 0);
 		recom_splir(rc, next);
 		recom_range(rc, 0);
-		recom_jmp(rc, start);
+		recom_jmp(rc, 0);
 		recom_label(rc, next);
 	}
 	else{
-		recom_label(rc, start);
+		recom_label(rc, 0);
 	}
 	recom_save(rc, 0);
 	return rc;

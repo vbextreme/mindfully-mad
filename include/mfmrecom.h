@@ -62,7 +62,7 @@ uint16_t* recom_make(recom_s* rc);
 #define CTOR()     recom_s RECOBJ; recom_ctor(&RECOBJ)
 #define INIT(R)    recom_s* RECOM = R
 #define ROBJ()     &RECOBJ
-#define END()      do{ recom_dtor(RECOM); }while(0)
+#define DTOR()      do{ recom_dtor(RECOM); }while(0)
 #define MATCH()    do{ recom_match(RECOM); }while(0)
 #define CHAR(CH)   do{ recom_char(RECOM, CH); }while(0)
 #define UNI(UTF8)  do{ recom_utf8(RECOM, UTF8); }while(0)

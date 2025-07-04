@@ -255,12 +255,73 @@ __private void def_repet(recom_s* rc){
 }
 
 //concat : repet+;
+__private void def_concat(recom_s* rc){
+	INIT(rc);
+	USELBL(1);
+	fn_prolog(rc, "concat", 1);
+	LABEL(L[0]); CALL("repeat", 0);
+	SPLIR(L[0]); fn_epilog(rc, 1);
+}
 
 //altern : concat ( '|' concat )*;
+__private void def_altern(recom_s* rc){
+	INIT(rc);
+	USELBL(2);
+	fn_prolog(rc, "altern", 1);
+	LABEL(L[1]); CALL("concat", 0);
+	SPLIT(L[0]);
+	CHAR('|');
+	CALL("concat", 0);
+	JMP(L[1]);
+	LABEL(L[0]); fn_epilog(rc, 1);
+}
 
 //regex  : '/' begin? altern end?'/'
+__private void def_regex(recom_s* rc){
+	INIT(rc);
+	USELBL(2);
+	fn_prolog(rc, "regex", 1);
+	CHAR('/');
+	SPLIT(L[0]);
+	CALL("begin", 0);
+	LABEL(L[0]); CALL("altern", 0);	
+	SPLIT(L[1]);
+	CALL("end", 0);
+	LABEL(L[1]); CHAR('/');
+	fn_epilog(rc, 1);
+}
 
 //_start_: regex;
+uint16_t* regram_make(void){
+	uint16_t* ret = NULL;
+	CTOR();
+	INIT(ROBJ());
+	def_opchar(ROBJ());
+	def_literal(ROBJ());
+	def_escaped(ROBJ());
+	def_char(ROBJ());
+	def_number(ROBJ());
+	def_begin(ROBJ());
+	def_end(ROBJ());
+	def_qtype(ROBJ());
+	def_lnum(ROBJ());
+	def_rnum(ROBJ());
+	def_qspec(ROBJ());
+	def_quanti(ROBJ());
+	def_chrange(ROBJ());
+	def_chclass(ROBJ());
+	def_group(ROBJ());
+	def_primary(ROBJ());
+	def_repet(ROBJ());
+	def_concat(ROBJ());
+	def_altern(ROBJ());
+	def_regex(ROBJ());
+	START(0);
+	ret = MAKE();
+	DTOR();
+	return ret;
+}
+
 
 
 

@@ -66,7 +66,7 @@ typedef struct revmMatch{
 }revmMatch_s;
 
 revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt);
-
+void revm_debug(uint16_t* bytecode, const utf8_t* txt);
 
 #endif
 
