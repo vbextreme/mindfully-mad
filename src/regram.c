@@ -28,7 +28,7 @@ group  : '(' altern ')'
 primary: literal
        | group
        | chclass
-       | escaped_char
+       | escaped
        | '.'
 ;
 repet  : primary ( quanti )?;
@@ -184,19 +184,75 @@ __private void def_quanti(recom_s* rc){
 }
 
 //chrange: char ('-' char)?;
+__private void def_chrange(recom_s* rc){
+	INIT(rc);
+	USELBL(1);
+	fn_prolog(rc, "chrange", 1);
+	CALL("char", 0);
+	SPLIT(L[0]);
+	CHAR('-');
+	CALL("char", 0);
+	LABEL(L[0]); fn_epilog(rc, 1);
+}
 
 //chclass: '[' chrange+ ']';
+__private void def_chclass(recom_s* rc){
+	INIT(rc);
+	USELBL(1);
+	fn_prolog(rc, "chclass", 1);
+	CHAR('[');
+	LABEL(L[0]); CALL("chrange", 0);
+	SPLIR(L[0]);
+	CHAR(']');
+	fn_epilog(rc, 1);
+}
 
 //group  : '(' altern ')'
+__private void def_group(recom_s* rc){
+	INIT(rc);
+	fn_prolog(rc, "group", 1);
+	CHAR('(');
+	CALL("altern", 0);
+	CHAR(')');
+	fn_epilog(rc, 1);
+}
 
 //primary: literal
 //       | group
 //       | chclass
-//       | escaped_char
+//       | escaped
 //       | '.'
 //;
+__private void def_primary(recom_s* rc){
+	INIT(rc);
+	USELBL(5);
+	fn_prolog(rc, "primary", 1);
+	SPLIT(L[1]);
+	CALL("literal", 0);
+	JMP(L[0]);
+	LABEL(L[1]); SPLIT(L[2]);
+	CALL("group", 0);
+	JMP(L[0]);
+	LABEL(L[2]); SPLIT(L[3]);
+	CALL("chclass", 0);
+	JMP(L[0]);
+	LABEL(L[3]); SPLIT(L[4]);
+	CALL("escaped", 0);
+	JMP(L[0]);
+	LABEL(L[4]); CHAR('.');
+	LABEL(L[0]); fn_epilog(rc, 1);
+}
 
-//repet  : primary ( quanti )?;
+//repet  : primary quanti?;
+__private void def_repet(recom_s* rc){
+	INIT(rc);
+	USELBL(1);
+	fn_prolog(rc, "repet", 1);
+	CALL("primary", 0);
+	SPLIT(L[0]);
+	CALL("quanti", 0);
+	LABEL(L[0]); fn_epilog(rc, 1);
+}
 
 //concat : repet+;
 
