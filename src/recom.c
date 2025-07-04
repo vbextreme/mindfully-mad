@@ -1,4 +1,4 @@
-#include "notstd/utf8.h"
+#include <notstd/utf8.h>
 #include <notstd/memory.h>
 #include <mfmrecom.h>
 #include <notstd/str.h>
@@ -8,6 +8,7 @@ recom_s* recom_ctor(recom_s* rc){
 	rc->bytecode = MANY(uint16_t, 64);
 	rc->label    = MANY(reclabel_s, 16);
 	rc->fn       = MANY(recfn_s, 16);
+	rc->call     = MANY(recfn_s, 16);
 	rc->range    = MANY(recrange_s, 16);
 	rc->urange   = MANY(recurange_s, 16);
 	
@@ -25,6 +26,8 @@ void recom_dtor(recom_s* rc){
 	m_free(rc->urange);
 	mforeach(rc->fn, i) m_free(rc->fn[i].name);
 	m_free(rc->fn);
+	mforeach(rc->call, i) m_free(rc->call[i].name);
+	m_free(rc->call);
 }
 
 recom_s* recom_match(recom_s* rc){
@@ -150,10 +153,19 @@ unsigned recom_fn(recom_s* rc, const char* name, unsigned len){
 	return ret;
 }
 
-recom_s* recom_call(recom_s* rc, unsigned ifn){
+recom_s* recom_calli(recom_s* rc, unsigned ifn){
 	unsigned bc = m_ipush(&rc->bytecode);
 	if( ifn > 4096 ) die("to many function");
 	rc->bytecode[bc] = OP_CALL | (ifn & 0x0FFF);
+	return rc;
+}
+
+recom_s* recom_call(recom_s* rc, const char* name, unsigned len){
+	unsigned bc = m_ipush(&rc->bytecode);
+	rc->bytecode[bc] = OP_CALL;
+	unsigned res = m_ipush(&rc->call);
+	rc->call[res].addr = bc;
+	rc->call[res].name = str_dup(name, len);
 	return rc;
 }
 
@@ -186,27 +198,14 @@ recom_s* recom_start(recom_s* rc, int search){
 	return rc;
 }
 
-uint16_t* recom_make(recom_s* rc){
-	//linker
-	mforeach(rc->label, it){
-		if( rc->label[it].address == -1 ) die("linker error: unknow label address");
-		mforeach(rc->label[it].resolve, i){
-			const unsigned bc  = rc->label[it].resolve[i];
-			uint16_t byc = rc->bytecode[bc];
-			uint16_t off;
-			unsigned op = BYTECODE_CMD40(byc);
-			if( rc->label[it].address < bc ){
-				off = bc - rc->label[it].address;
-				op += 0x1000;
-			}
-			else{
-				off = rc->label[it].address - bc;
-			}
-			if( off > 4096 ) die("linker error: jump to long %u", off);
-			rc->bytecode[bc] = op | off;
-		}
+__private long name_to_ifn(recom_s* rc, const char* name){
+	mforeach(rc->fn, i){
+		if( !strcmp(rc->fn[i].name, name) ) return i;
 	}
-	
+	return -1;
+}
+
+uint16_t* recom_make(recom_s* rc){
 	unsigned totalheader = BYC_HEADER_SIZE +
 		m_header(rc->range)->len * 16 +
 		m_header(rc->fn)->len
@@ -247,6 +246,32 @@ uint16_t* recom_make(recom_s* rc){
 		len /= 2;
 		inc += len;
 	}
+	
+	//linker
+	mforeach(rc->label, it){
+		if( rc->label[it].address == -1 ) die("linker error: unknow label address");
+		mforeach(rc->label[it].resolve, i){
+			const unsigned bc  = rc->label[it].resolve[i];
+			uint16_t byc = rc->bytecode[bc];
+			uint16_t off;
+			unsigned op = BYTECODE_CMD40(byc);
+			if( rc->label[it].address < bc ){
+				off = bc - rc->label[it].address;
+				op += 0x1000;
+			}
+			else{
+				off = rc->label[it].address - bc;
+			}
+			if( off > 4096 ) die("linker error: jump to long %u", off);
+			rc->bytecode[bc] = op | off;
+		}
+	}
+	mforeach(rc->call, it){
+		long ifn = name_to_ifn(rc, rc->call[it].name);
+		if( ifn == -1 ) die("linker error: unable CALL, unknown function name '%s'", rc->call[it].name);
+		rc->bytecode[rc->call[it].addr] |= ifn & 0x0FFF;
+	}
+	
 	memcpy(inc, rc->bytecode, m_header(rc->bytecode)->len);
 	return bc;
 }

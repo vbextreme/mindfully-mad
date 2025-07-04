@@ -3,6 +3,8 @@
 
 #include <mfmrevm.h>
 
+//TODO non posso sapere quale ifn chiamare in CALL, bisogna fare resolve in link con il nome
+
 typedef struct reclabel{
 	long      address;
 	unsigned* resolve;
@@ -25,6 +27,7 @@ typedef struct recfn{
 typedef struct recom{
 	uint16_t*    bytecode;
 	recfn_s*     fn;
+	recfn_s*     call;
 	reclabel_s*  label;
 	recrange_s*  range;
 	recurange_s* urange;
@@ -49,25 +52,28 @@ recom_s* recom_jmp(recom_s* rc, unsigned lbl);
 recom_s* recom_save(recom_s* rc, uint8_t id);
 recom_s* recom_node(recom_s* rc, uint16_t id);
 unsigned recom_fn(recom_s* rc, const char* name, unsigned len);
-recom_s* recom_call(recom_s* rc, unsigned ifn);
+recom_s* recom_calli(recom_s* rc, unsigned ifn);
+recom_s* recom_call(recom_s* rc, const char* name, unsigned len);
 recom_s* recom_ret(recom_s* rc);
 recom_s* recom_parent(recom_s* rc);
 recom_s* recom_start(recom_s* rc, int search);
 uint16_t* recom_make(recom_s* rc);
 
 #define CTOR()     recom_s RECOBJ; recom_ctor(&RECOBJ)
-#define INIT(R)    recrange_s TMPRANGE; recom_s* RECOM = R
+#define INIT(R)    recom_s* RECOM = R
 #define ROBJ()     &RECOBJ
 #define END()      do{ recom_dtor(RECOM); }while(0)
 #define MATCH()    do{ recom_match(RECOM); }while(0)
 #define CHAR(CH)   do{ recom_char(RECOM, CH); }while(0)
 #define UNI(UTF8)  do{ recom_utf8(RECOM, UTF8); }while(0)
-#define RRANGE()   do{ recom_range_ctor(TMPRANGE); }while(0)
-#define RRSET(CH)  do{ recom_range_set(TMPRANGE, ch); }while(0)
-#define RRREV(CH)  do{ recom_range_reverse(TMPRANGE); }while(0)
-#define RRADD()    recom_range_add(RECOM, TMPRANGE)
+#define USERANGE(R) recrange_s TMPRANGE
+#define RRANGE()   do{ recom_range_ctor(&TMPRANGE); }while(0)
+#define RRSET(CH)  do{ recom_range_set(&TMPRANGE, CH); }while(0)
+#define RRREV(CH)  do{ recom_range_reverse(&TMPRANGE); }while(0)
+#define RRADD()    recom_range_add(RECOM, &TMPRANGE)
 #define RANGE(ID)  do{ recom_range(RECOM, ID); }while(0)
-#define LABEL()    recom_label(RECOM, recom_label_new(RECOM))
+#define USELBL(N)  unsigned L[N]; for( unsigned i = 0; i < N; ++i ) L[i] = recom_label_new(RECOM)
+#define LABEL(LBL) do{ recom_label(RECOM, LBL);}while(0)
 #define LABDA()    recom_label_new(RECOM)
 #define SPLIT(LBL) do{ recom_split(RECOM, LBL); }while(0)
 #define SPLIR(LBL) do{ recom_splir(RECOM, LBL); }while(0)
@@ -75,7 +81,8 @@ uint16_t* recom_make(recom_s* rc);
 #define SAVE(ID)   do{ recom_save(RECOM, ID); }while(0)
 #define NODE(ID)   do{ recom_node(RECOM, ID); }while(0)
 #define FN(N,L)    recom_fn(RECOM, N, L)
-#define CALL(ID)   do{ recom_call(RECOM, ID); }while(0)
+#define CALLI(ID)  do{ recom_calli(RECOM, ID); }while(0)
+#define CALL(N,L)  do{ recom_call(RECOM, N, L); }while(0)
 #define RET()      do{ recom_ret(RECOM); }while(0)
 #define PARENT()   do{ recom_parent(RECOM); }while(0)
 #define START(S)   do{ recom_start(RECOM, S); }while(0)
