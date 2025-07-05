@@ -33,12 +33,14 @@ void recom_dtor(recom_s* rc){
 }
 
 recom_s* recom_match(recom_s* rc){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_MATCH;
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_MATCH;
 	return rc;
 }
 
 recom_s* recom_char(recom_s* rc, uint8_t val){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_CHAR | val;
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_CHAR | val;
 	return rc;
 }
 
@@ -89,7 +91,8 @@ unsigned recom_range_add(recom_s* rec, recrange_s* range){
 }
 
 recom_s* recom_range(recom_s* rc, uint16_t val){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_RANGE | (val&0x0FFF);
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_RANGE | (val&0x0FFF);
 	return rc;
 }
 
@@ -137,12 +140,14 @@ recom_s* recom_jmp(recom_s* rc, unsigned lbl){
 }
 
 recom_s* recom_save(recom_s* rc, uint8_t id){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_EXT | OPE_SAVE | id;
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_EXT | OPE_SAVE | id;
 	return rc;
 }
 
 recom_s* recom_node(recom_s* rc, uint16_t id){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_NODE | (id&0x0FFF);
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_NODE | (id&0x0FFF);
 	return rc;
 }
 
@@ -172,7 +177,8 @@ recom_s* recom_call(recom_s* rc, const char* name, unsigned len){
 }
 
 recom_s* recom_ret(recom_s* rc){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_EXT | OPE_RET;
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_EXT | OPE_RET;
 	return rc;
 }
 

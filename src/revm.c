@@ -256,7 +256,7 @@ regex vm stack based
 typedef struct revmStack{
 	unsigned      pc;
 	const utf8_t* sp;
-	unsigned      ls;
+	int           ls;
 	unsigned      cp;
 	unsigned      np;
 }revmStack_s;
@@ -272,7 +272,7 @@ typedef struct revm{
 	bcnode_s*      node;
 	const utf8_t*  sp;
 	uint32_t       pc;
-	uint32_t       ls;
+	int            ls;
 	uint32_t       sectionStart;
 	uint32_t       sectionFn;
 	uint32_t       sectionRange;
@@ -310,7 +310,7 @@ __private int range(revm_s* vm, unsigned ir, utf8_t ch){
 __private void save(revm_s* vm, unsigned id){
 	iassert(id < 256);
 	vm->save[id] = vm->sp;
-	if( id > vm->ls ) vm->ls = id;
+	if( (int)id > vm->ls ) vm->ls = id;
 }
 
 __private void call(revm_s* vm, unsigned ifn){
@@ -442,6 +442,7 @@ revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
 	vm->stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
 	vm->cstk     = MANY(unsigned, 128);
 	vm->node     = MANY(bcnode_s, 32);
+	vm->ls       = -1;
 	return vm;
 }
 
@@ -552,10 +553,10 @@ __private void term_cline(unsigned len){
 /*
 	start:
 
-	stack     |    node | capture
-	1         | 1       | 1       
-	2         | 2       | 2       
-	3         | 3       | 3       
+	stack     | callstack   node | capture
+	1         | 1         |       | 1       
+	2         | 2         |       | 2       
+	3         | 3         |       | 3         
     -------------------------------------------
 	command
 	1
@@ -572,11 +573,13 @@ __private void term_cline(unsigned len){
 #define DBG_STACKED_H 5
 #define DBG_RANGE_H   1
 #define DBG_CODE_H    20
-#define DBG_INP_H     1
+#define DBG_PROMPT_H  1
+#define DBG_INP_H     2
 #define DBG_SCREEN_W  120
-#define DBG_STACK_W   (DBG_SCREEN_W/3)
-#define DBG_NODE_W    (DBG_SCREEN_W/3-1)
-#define DBG_CAPTURE_W (DBG_SCREEN_W/3-1)
+#define DBG_STACK_W   (DBG_SCREEN_W/4)
+#define DBG_CSTACK_W  (DBG_SCREEN_W/4-1)
+#define DBG_NODE_W    (DBG_SCREEN_W/4-1)
+#define DBG_CAPTURE_W (DBG_SCREEN_W/4-1)
 
 __private void putc_view_char(unsigned ch){
 	if( ch == '\n' ) fputs("↵", stdout);
@@ -590,6 +593,7 @@ __private void putc_view_char(unsigned ch){
 
 __private void draw_cx_line(unsigned box){
 	term_box(7); term_hline(DBG_STACK_W); term_box(box);
+	term_hline(DBG_CSTACK_W); term_box(box);
 	term_hline(DBG_NODE_W); term_box(box);
 	term_hline(DBG_CAPTURE_W); term_box(3);
 }
@@ -601,10 +605,16 @@ __private void draw_box(void){
 	term_vline(DBG_HEADER_H);
 	draw_cx_line(1);
 	term_gotoxy(DBG_SCREEN_W+1, 1); term_vline(DBG_HEADER_H);
+
 	term_gotoxy(0, y); term_vline(DBG_STACKED_H); 
 	draw_cx_line(5);
-	term_gotoxy(DBG_STACK_W+1, y); term_vline(DBG_STACKED_H); 
-	term_gotoxy(DBG_STACK_W+1+DBG_NODE_W+1, y); term_vline(DBG_STACKED_H);
+	unsigned x = DBG_STACK_W+1;
+	term_gotoxy(x, y); term_vline(DBG_STACKED_H);
+	x += DBG_CSTACK_W+1;
+	term_gotoxy(x, y); term_vline(DBG_STACKED_H);
+	x += DBG_NODE_W+1;
+	term_gotoxy(x, y); term_vline(DBG_STACKED_H);
+	
 	term_gotoxy(DBG_SCREEN_W+1, y); term_vline(DBG_STACKED_H);
 	y += DBG_STACKED_H+1;
 	term_gotoxy(0, y); term_vline(DBG_RANGE_H);
@@ -615,10 +625,16 @@ __private void draw_box(void){
 	term_box(7); term_hline(DBG_SCREEN_W); term_box(3);
 	term_gotoxy(DBG_SCREEN_W+1, y); term_vline(DBG_CODE_H);
 	term_gotoxy(0, y); term_vline(DBG_CODE_H);
+	
 	y += DBG_CODE_H+1;
 	term_gotoxy(0, y); term_vline(DBG_INP_H);
-	term_box(6); term_hline(DBG_SCREEN_W); term_box(4);
+	term_box(7); term_hline(DBG_SCREEN_W); term_box(3);
 	term_gotoxy(DBG_SCREEN_W+1, y); term_vline(DBG_INP_H);
+	
+	y += DBG_INP_H+1;
+	term_gotoxy(0, y); term_vline(DBG_PROMPT_H);
+	term_box(6); term_hline(DBG_SCREEN_W); term_box(4);
+	term_gotoxy(DBG_SCREEN_W+1, y); term_vline(DBG_PROMPT_H);
 }
 
 __private void draw_cls_rect(unsigned x, unsigned y, unsigned w, unsigned h){
@@ -648,13 +664,53 @@ __private void draw_stack(revmStack_s* base, const utf8_t* txt){
 	draw_cls_rect(1, DBG_HEADER_H+2, DBG_STACK_W, DBG_STACKED_H);
 	while( ny-->0 && sc < count){
 		term_gotoxy(1,y--);
-		printf("pc:%04X sp:%4lu cp:%3u ls:%3u np:%4u",
+		printf(" %% pc:%04X sp:%4lu ls:%3d",
 			base[sc].pc,
 			base[sc].sp-txt,
-			base[sc].cp,
-			base[sc].ls,
-			base[sc].np
+			base[sc].ls
 		);
+		++sc;
+	}
+}
+
+__private void draw_cstack(revm_s* vm){
+	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
+	unsigned ny = DBG_STACKED_H;
+	unsigned count = m_header(vm->cstk)->len;
+	unsigned sc = count > ny ? count - ny: 0;
+	unsigned x = DBG_STACK_W+2;
+	draw_cls_rect(x, DBG_HEADER_H+2, DBG_CSTACK_W, DBG_STACKED_H);
+	while( ny-->0 && sc < count){
+		term_gotoxy(x, y--);
+		printf(" <- pc:%4X", vm->cstk[sc]);
+		++sc;
+	}
+}
+
+__private void draw_node(revm_s* vm){
+	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
+	unsigned ny = DBG_STACKED_H;
+	unsigned count = m_header(vm->node)->len;
+	unsigned sc = count > ny ? count - ny: 0;
+	unsigned x = DBG_STACK_W+2+DBG_CSTACK_W+1;
+	draw_cls_rect(x, DBG_HEADER_H+2, DBG_NODE_W, DBG_STACKED_H);
+	while( ny-->0 && sc < count){
+		term_gotoxy(x, y--);
+		printf(" [] op:%1u id:%4u", vm->node[sc].op, vm->node[sc].id);
+		++sc;
+	}
+}
+
+__private void draw_save(revm_s* vm, const utf8_t* txt){
+	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
+	unsigned ny = DBG_STACKED_H;
+	unsigned count = vm->ls+1;
+	unsigned sc = count > ny ? count - ny: 0;
+	unsigned x = DBG_STACK_W+2+DBG_CSTACK_W+1+DBG_NODE_W+1;
+	draw_cls_rect(x, DBG_HEADER_H+2, DBG_NODE_W, DBG_STACKED_H);
+	while( ny-->0 && sc < count){
+		term_gotoxy(x, y--);
+		printf(" $ %lu", vm->save[sc] ? vm->save[sc] - txt : 0);
 		++sc;
 	}
 }
@@ -695,10 +751,13 @@ __private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap){
 	unsigned byc = vm->code[pc];
 	switch( BYTECODE_CMD40(byc) ){
 		default : printf("INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
+		case OP_RANGE :
+			printf("range %u", BYTECODE_VAL12(byc));
+			draw_range(vm, BYTECODE_VAL12(byc), *vm->stack[m_header(vm->stack)->len-1].sp);
+		break;
 		case OP_URANGE: break;
 		case OP_MATCH :  fputs("match", stdout); break;
 		case OP_CHAR  :  fputs("char ", stdout); putc_view_char(BYTECODE_VAL08(byc)); break;
-		case OP_RANGE : printf("range %u", BYTECODE_VAL12(byc)); break;
 		case OP_SPLITF: printf("split %X", pc + BYTECODE_VAL12(byc)); break;
 		case OP_SPLITB: printf("split %X", pc - BYTECODE_VAL12(byc)); break;
 		case OP_SPLIRF: printf("splir %X", pc + BYTECODE_VAL12(byc)); break;
@@ -729,7 +788,7 @@ __private void draw_code(revm_s* vm, unsigned pc, const char** nmap){
 	unsigned high = low + DBG_CODE_H;
 	if( high > count ){
 		high = count+1;
-		low = high - DBG_CODE_H;
+		low = (long)high - DBG_CODE_H;
 		if( low < 0 ) low = 0;
 	}
 	for(unsigned i = low; i < high; ++i ){
@@ -747,16 +806,54 @@ __private void draw_code(revm_s* vm, unsigned pc, const char** nmap){
 	}
 }
 
-__private char* input(void){
-	term_gotoxy(1, DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1);
+__private void draw_input(revm_s* vm, const utf8_t* txt, unsigned len){
+	unsigned y = DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1;
+	draw_cls_rect(1, y, DBG_SCREEN_W, DBG_INP_H);
+	unsigned const ls = m_header(vm->stack)->len-1;
+	unsigned offx = vm->stack[ls].sp - txt;
+	long low = offx;
+	low -= DBG_SCREEN_W/2;
+	if( low < 0 ) low = 0;
+
+	unsigned high = low + DBG_SCREEN_W;
+
+	if( high > len ){
+		high = len;
+		low = (long)high - DBG_SCREEN_W;
+		if( low < 0 ) low = 0;
+	}
+	term_gotoxy(1, y);
+	for( unsigned i = low; i < high; ++i ){
+		putc_view_char(txt[i]);
+	}
+	term_gotoxy(offx+1, y+1);
+	putchar('^');
+}
+
+
+__private char* prompt(void){
+	term_gotoxy(1, DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1+DBG_INP_H+1);
 	return readline("> ");
 }
 
 __private void onend(void){
-	term_gotoxy(1, DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1+DBG_INP_H+1);
+	term_gotoxy(0, DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1+DBG_PROMPT_H+1+DBG_INP_H+1);
 	fflush(stdout);
 }
 
+__private void redraw(revm_s* vm, const utf8_t* txt, unsigned len, const char** nmap){
+	draw_header(vm->sectionStart, vm->bytecode[BYC_RANGE_COUNT], vm->bytecode[BYC_FN_COUNT], m_header(vm->stack)->len);
+	draw_stack(vm->stack, txt);
+	draw_cstack(vm);
+	draw_node(vm);
+	draw_save(vm, txt);
+	unsigned const sl = m_header(vm->stack)->len;
+	if( sl ){
+		draw_code(vm, vm->stack[sl-1].pc, nmap);
+		draw_input(vm, txt, len);
+	}
+	fflush(stdout);
+}
 
 void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 	revmMatch_s ret = {.match = 0, .node = NULL};
@@ -764,22 +861,16 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 	revm_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
 	__free const char** nmap = revm_map_name(bytecode);
-	
+	unsigned len = strlen((char*)txt);
 	draw_clear();
 	draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
-	vm.pc = 0;
 
 	while( 1 ){
-		draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
-		draw_stack(vm.stack, txt);
-		fflush(stdout);
-		input();
+		redraw(&vm, txt, len, nmap);
+		prompt();
 		if( !stk_pop(&vm) ) break;
-		draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
-		draw_stack(vm.stack, txt);
-		draw_code(&vm, vm.pc, nmap);
-		fflush(stdout);
-		input();
+		//redraw(&vm, txt, nmap);
+		//input();
 		if( !vm_exec(&vm, &ret) ) break;
 	}
 	revm_dtor(&vm);
