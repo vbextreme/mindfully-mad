@@ -317,6 +317,7 @@ uint16_t* regram_make(void){
 	def_altern(ROBJ());
 	def_regex(ROBJ());
 	START(0);
+	CALL("regex",0);
 	ret = MAKE();
 	DTOR();
 	return ret;

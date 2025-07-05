@@ -150,7 +150,7 @@ unsigned recom_fn(recom_s* rc, const char* name, unsigned len){
 	unsigned ret = m_ipush(&rc->fn);
 	unsigned addr =  m_header(rc->bytecode)->len;
 	if( addr > UINT16_MAX ) die("function address to long %u", addr);
-	rc->fn[ret].addr = m_header(rc->bytecode)->len-1;
+	rc->fn[ret].addr = addr;
 	rc->fn[ret].name = str_dup(name, len);
 	return ret;
 }
@@ -230,8 +230,8 @@ uint16_t* recom_make(recom_s* rc){
 	uint16_t* inc = &bc[BYC_HEADER_SIZE];
 	bc[BYC_SECTION_FN] = inc - bc;
 	mforeach(rc->fn, i){
-		if( totalheader + rc->fn[i].addr > UINT16_MAX ) die("linker error: function call outside address %u", totalheader+rc->fn[i].addr);
-		*inc++ = totalheader + rc->fn[i].addr;
+		if( rc->fn[i].addr > UINT16_MAX ) die("linker error: function call outside address %u", rc->fn[i].addr);
+		*inc++ = rc->fn[i].addr;
 	}
 	//.section range
 	bc[BYC_SECTION_RANGE] = inc - bc;

@@ -703,7 +703,7 @@ __private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap){
 		case OP_JMPF  : printf("jmp   %X", pc + BYTECODE_VAL12(byc)); break;
 		case OP_JMPB  : printf("jmp   %X", pc - BYTECODE_VAL12(byc)); break;
 		case OP_NODE  : printf("node  %s::%u", nmap[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
-		case OP_CALL  : printf("call  %s::%u", nmap[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
+		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), nmap[BYTECODE_VAL12(byc)], vm->fn[BYTECODE_VAL12(byc)]); break;
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
 				case OPE_SAVE  : printf("save  %u", BYTECODE_VAL08(byc)); break;
