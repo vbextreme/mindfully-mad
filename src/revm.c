@@ -297,7 +297,7 @@ __private int stk_pop(revm_s* vm){
 	vm->sp = vm->stack[i].sp;
 	vm->ls = vm->stack[i].ls;
 	m_header(vm->cstk)->len = vm->stack[i].cp;
-	m_header(vm->cstk)->len = vm->stack[i].np;
+	m_header(vm->node)->len = vm->stack[i].np;
 	return 1;
 }
 
@@ -399,16 +399,18 @@ __private int vm_exec(revm_s* vm, revmMatch_s* ret){
 		
 		case OP_NODE:
 			node(vm, NOP_NEW, BYTECODE_VAL12(byc));
+			stk_push(vm, vm->pc+1, vm->sp);	
 		break;
 		
 		case OP_CALL:
-			call(vm, BYTECODE_CMD40(byc));
+			call(vm, BYTECODE_VAL12(byc));
 		break;
 		
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
 				case OPE_SAVE:
 					save(vm, BYTECODE_VAL08(byc));
+					stk_push(vm, vm->pc+1, vm->sp);
 				break;
 				
 				case OPE_RET:
@@ -417,6 +419,7 @@ __private int vm_exec(revm_s* vm, revmMatch_s* ret){
 				
 				case OPE_PARENT:
 					node(vm, NOP_PARENT, 0);
+					stk_push(vm, vm->pc+1, vm->sp);
 				break;
 			}
 		break;
@@ -756,7 +759,7 @@ __private void onend(void){
 
 
 void revm_debug(uint16_t* bytecode, const utf8_t* txt){
-	//revmMatch_s ret = {.match = 0, .node = NULL};
+	revmMatch_s ret = {.match = 0, .node = NULL};
 	revm_s vm;
 	revm_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
@@ -764,21 +767,23 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 	
 	draw_clear();
 	draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
-	draw_stack(vm.stack, txt);
-	//draw_code(&vm, 0, nmap);
-	//draw_range(&vm, 0, -1);
-	//draw node
-	//draw capture
-	//draw code
-	//fflush(stdout);
-	draw_code(&vm, vm.sectionStart, nmap);
-	fflush(stdout);
-	input();
-	onend();
-//exit(1);
+	vm.pc = 0;
 
-//	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
+	while( 1 ){
+		draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
+		draw_stack(vm.stack, txt);
+		fflush(stdout);
+		input();
+		if( !stk_pop(&vm) ) break;
+		draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
+		draw_stack(vm.stack, txt);
+		draw_code(&vm, vm.pc, nmap);
+		fflush(stdout);
+		input();
+		if( !vm_exec(&vm, &ret) ) break;
+	}
 	revm_dtor(&vm);
+	onend();
 }
 
 
