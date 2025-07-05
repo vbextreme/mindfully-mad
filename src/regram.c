@@ -259,7 +259,7 @@ __private void def_concat(recom_s* rc){
 	INIT(rc);
 	USELBL(1);
 	fn_prolog(rc, "concat", 1);
-	LABEL(L[0]); CALL("repeat", 0);
+	LABEL(L[0]); CALL("repet", 0);
 	SPLIR(L[0]); fn_epilog(rc, 1);
 }
 

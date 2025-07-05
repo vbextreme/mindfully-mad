@@ -2,6 +2,7 @@
 #include <notstd/opt.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <mfmrevm.h>
 
 typedef enum{
 	OPT_g,
@@ -18,6 +19,10 @@ option_s opt[] = {
 };
 
 int main(int argc, char** argv){
+	uint16_t* rxbyc = regram_make();
+revm_debug(rxbyc,(utf8_t*)"/a*(b|z)/");
+exit(0);
+
 	argv_parse(opt, argc, argv);
 	if( opt[OPT_h].set ){
 		argv_usage(opt, argv[0]);

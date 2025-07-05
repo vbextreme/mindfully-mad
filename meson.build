@@ -65,6 +65,7 @@ src += [ 'src/inutility.c' ]
 src += [ 'src/lexer.c' ]
 src += [ 'src/revm.c' ]
 src += [ 'src/recom.c' ]
+src += [ 'src/regram.c' ]
 src += [ 'src/mfm.c' ]
 src += [ 'src/mbi.c' ]
 
