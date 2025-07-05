@@ -66,8 +66,8 @@ __private void token_class(recom_s* rc, const char* name, const char* accept, un
 	unsigned r = token_range(rc, accept, rev);
 	fn_prolog(rc, name, 1);
 	switch( quantifier ){
-		case '0': RANGE(r); break;
-		case '1':{ //+
+		case 0: RANGE(r); break;
+		case 1:{ //+
 			USELBL(1);
 			LABEL(L[0]); RANGE(r);
 			SPLIR(L[0]);
