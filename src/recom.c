@@ -223,7 +223,7 @@ uint16_t* recom_make(recom_s* rc){
 	bc[BYC_RANGE_COUNT]  = m_header(rc->range)->len;
 	bc[BYC_URANGE_COUNT] = m_header(rc->urange)->len;
 	bc[BYC_FN_COUNT]     = m_header(rc->fn)->len;
-	bc[BYC_START]        = totalheader + rc->label[0].address;
+	bc[BYC_START]        = rc->label[0].address;
 	bc[BYC_CODELEN]      = m_header(rc->bytecode)->len;
 	
 	//.section fn
@@ -275,10 +275,9 @@ uint16_t* recom_make(recom_s* rc){
 		if( ifn == -1 ) die("linker error: unable CALL, unknown function name '%s'", rc->call[it].name);
 		rc->bytecode[rc->call[it].addr] |= ifn & 0x0FFF;
 	}
-	
 	//.section code
 	bc[BYC_SECTION_CODE] = inc - bc;
-	memcpy(inc, rc->bytecode, m_header(rc->bytecode)->len);
+	memcpy(inc, rc->bytecode, m_header(rc->bytecode)->len*sizeof(uint16_t));
 	return bc;
 }
 
