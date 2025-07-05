@@ -450,9 +450,9 @@ const char** revm_map_name(const uint16_t* bytecode){
 	m_header(ret)->len = count;
 	for( unsigned i = 0; i < count; ++i ){
 		ret[i] = (const char*)n;
-		unsigned len = strlen((const char*)n);
+		unsigned len = strlen(ret[i])+1;
 		len = ROUND_UP(len, 2);
-		n += len;
+		n += len/2;
 	}
 	return ret;
 }
@@ -729,6 +729,10 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 	revm_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
 	__free const char** nmap = revm_map_name(bytecode);
+//	mforeach(nmap,i){
+//		printf("name:'%s'\n", nmap[i]);
+//	}
+	exit(1);
 	draw_clear();
 	draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
 	draw_stack(vm.stack, txt);

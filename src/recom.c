@@ -244,8 +244,8 @@ uint16_t* recom_make(recom_s* rc){
 	//.section name
 	bc[BYC_SECTION_NAME] = inc - bc;
 	mforeach(rc->fn, i){
-		unsigned len = strlen(rc->fn[i].name);
-		strcpy((char*)inc, rc->fn[i].name);
+		unsigned len = strlen(rc->fn[i].name)+1;
+		memcpy(inc, rc->fn[i].name, len);
 		len = ROUND_UP(len, 2);
 		len /= 2;
 		inc += len;
