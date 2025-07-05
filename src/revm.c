@@ -753,7 +753,7 @@ __private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap){
 		default : printf("INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
 		case OP_RANGE :
 			printf("range %u", BYTECODE_VAL12(byc));
-			draw_range(vm, BYTECODE_VAL12(byc), *vm->stack[m_header(vm->stack)->len-1].sp);
+			//draw_range(vm, BYTECODE_VAL12(byc), *vm->stack[m_header(vm->stack)->len-1].sp);
 		break;
 		case OP_URANGE: break;
 		case OP_MATCH :  fputs("match", stdout); break;
