@@ -16,6 +16,7 @@ recom_s* recom_ctor(recom_s* rc){
 	recom_range_ctor(&any);
 	recom_range_set(&any, 0);
 	recom_range_reverse(&any);
+	recom_range_add(rc, &any);
 	recom_label_new(rc);
 	return rc;
 }
@@ -227,17 +228,21 @@ uint16_t* recom_make(recom_s* rc){
 	
 	//.section fn
 	uint16_t* inc = &bc[BYC_HEADER_SIZE];
+	bc[BYC_SECTION_FN] = inc - bc;
 	mforeach(rc->fn, i){
 		if( totalheader + rc->fn[i].addr > UINT16_MAX ) die("linker error: function call outside address %u", totalheader+rc->fn[i].addr);
 		*inc++ = totalheader + rc->fn[i].addr;
 	}
 	//.section range
+	bc[BYC_SECTION_RANGE] = inc - bc;
 	mforeach(rc->range, i){
 		memcpy(inc, rc->range[i].map, sizeof(uint16_t)*16);
 		inc += 16;
 	}
 	//.section urange
+	bc[BYC_SECTION_URANGE] = inc - bc;
 	//.section name
+	bc[BYC_SECTION_NAME] = inc - bc;
 	mforeach(rc->fn, i){
 		unsigned len = strlen(rc->fn[i].name);
 		strcpy((char*)inc, rc->fn[i].name);
@@ -271,6 +276,8 @@ uint16_t* recom_make(recom_s* rc){
 		rc->bytecode[rc->call[it].addr] |= ifn & 0x0FFF;
 	}
 	
+	//.section code
+	bc[BYC_SECTION_CODE] = inc - bc;
 	memcpy(inc, rc->bytecode, m_header(rc->bytecode)->len);
 	return bc;
 }

@@ -270,9 +270,10 @@ typedef struct revm{
 	unsigned*      cstk;
 	bcnode_s*      node;
 	const utf8_t*  sp;
-	uint32_t       start;
 	uint32_t       pc;
-	unsigned       ls;
+	uint32_t       ls;
+	uint32_t       sectionStart;
+	uint32_t       sectionCode;
 }revm_s;
 
 __private void stk_push(revm_s* vm, unsigned pc, const utf8_t* sp){
@@ -298,7 +299,7 @@ __private int stk_pop(revm_s* vm){
 __private int range(revm_s* vm, unsigned ir, utf8_t ch){
 	const unsigned im = ch & 0x0F;
 	const unsigned bm = 1 << (ch>>4);
-	return vm->range[ir+im] & bm;
+	return vm->range[ir*16+im] & bm;
 }
 
 __private void save(revm_s* vm, unsigned id){
@@ -308,7 +309,7 @@ __private void save(revm_s* vm, unsigned id){
 }
 
 __private void call(revm_s* vm, unsigned ifn){
-	stk_push(vm, vm->start + vm->fn[ifn], vm->sp);
+	stk_push(vm, vm->fn[ifn], vm->sp);
 	unsigned i = m_ipush(&vm->cstk);
 	vm->cstk[i] = vm->pc+1;
 }
@@ -332,7 +333,7 @@ __private void node(revm_s* vm, nodeOP_e op, unsigned id){
 }
 
 __private int vm_exec(revm_s* vm, revmMatch_s* ret){
-	const unsigned byc = vm->bytecode[vm->pc];
+	const unsigned byc = vm->bytecode[vm->sectionCode + vm->pc];
 	switch( BYTECODE_CMD40(byc) ){
 		case OP_MATCH:
 			save(vm, 1);
@@ -418,25 +419,68 @@ __private int vm_exec(revm_s* vm, revmMatch_s* ret){
 	return -1;
 }
 
+revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
+	vm->bytecode = bytecode;
+	vm->fn       = &bytecode[bytecode[BYC_SECTION_FN]];
+	vm->range    = &bytecode[bytecode[BYC_SECTION_RANGE]];
+	vm->pc       = 0;
+	vm->stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
+	vm->cstk     = MANY(unsigned, 128);
+	vm->node     = MANY(bcnode_s, 32);
+	vm->sp       = txt;
+	vm->sectionStart = bytecode[BYC_START];
+	vm->sectionCode  = bytecode[BYC_SECTION_CODE];
+	return vm;
+}
+
 revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt){
 	revmMatch_s ret = {.match = 0, .node = NULL};
-	
 	revm_s vm;
-	vm.bytecode = bytecode;
-	vm.fn       = &bytecode[bytecode[BYC_SECTION_FN]];
-	vm.range    = &bytecode[bytecode[BYC_SECTION_RANGE]];
-	vm.pc       = 0;
-	vm.stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
-	vm.cstk     = MANY(unsigned, 128);
-	vm.node     = MANY(bcnode_s, 32);
-	vm.start    = bytecode[BYC_START];
-	vm.sp       = txt;
-	
-	stk_push(&vm, vm.start, vm.sp);
+	revm_ctor(&vm, bytecode, txt);
+	stk_push(&vm, vm.sectionStart, vm.sp);
 	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
 	revm_dtor(&vm);
 	return ret;
 }
+
+const char** revm_map_name(const uint16_t* bytecode){
+	unsigned const count = bytecode[BYC_FN_COUNT];
+	const uint16_t* n = &bytecode[bytecode[BYC_SECTION_NAME]];
+	const char** ret = MANY(const char*, count);
+	m_header(ret)->len = count;
+	for( unsigned i = 0; i < count; ++i ){
+		ret[i] = (const char*)n;
+		unsigned len = strlen((const char*)n);
+		len = ROUND_UP(len, 2);
+		n += len;
+	}
+	return ret;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 __private void term_cls(void){
 	fputs("\033[2J\033[H", stdout);
@@ -456,7 +500,7 @@ __private void term_prevx(unsigned x){
 
 
 __private void term_fcol(unsigned col){
-	printf("\033[38;5;%umm", col);
+	printf("\033[38;5;%um", col);
 }
 
 __private void term_bcol(unsigned col){
@@ -510,13 +554,23 @@ __private void term_vline(unsigned len){
 
 #define DBG_HEADER_H  1
 #define DBG_STACKED_H 5
-#define DBG_RANGE_H   3
+#define DBG_RANGE_H   1
 #define DBG_CODE_H    20
 #define DBG_INP_H     1
 #define DBG_SCREEN_W  120
 #define DBG_STACK_W   (DBG_SCREEN_W/3)
 #define DBG_NODE_W    (DBG_SCREEN_W/3-1)
 #define DBG_CAPTURE_W (DBG_SCREEN_W/3-1)
+
+__private void putc_view_char(unsigned ch){
+	if( ch == '\n' ) fputs("↵", stdout);
+	else if( ch == '\t' ) fputs("→", stdout);
+	else if( ch == ' '  ) fputs("␣", stdout);
+	else if( ch < 32 ) printf("%3d", ch);
+	else if( ch < 128 ) putchar(ch);
+	else printf("%3d", ch);
+}
+
 
 __private void draw_cx_line(unsigned box){
 	term_box(7); term_hline(DBG_STACK_W); term_box(box);
@@ -579,6 +633,85 @@ __private void draw_stack(revmStack_s* base, const utf8_t* txt){
 	}
 }
 
+__private void draw_range(revm_s* vm, unsigned idrange, long ch){
+	const unsigned cunset = 130;
+	const unsigned cerr   = 124;
+	const unsigned cset   = 22;
+	const unsigned cmatch = 17;
+	term_gotoxy(1, DBG_HEADER_H+2+DBG_STACKED_H+1);
+	printf("range:%4u ch:", idrange);
+	if( ch == -1 ){
+		term_bcol(cunset);
+	}
+	else{
+		term_bcol( range(vm, idrange, ch)? cmatch: cerr);
+	}
+	putc_view_char(ch);
+	term_reset();
+	printf("  ");
+	for( unsigned i = '\t'; i < 128; ++i ){
+		if( i != '\t' && i != '\n' && i < 32 ) continue;
+		if( range(vm, idrange, i ) ){
+			if( ch == i ) term_bcol(cmatch);
+			else term_bcol(cset);
+		}
+		else{
+			if( ch == i ) term_bcol(cerr);
+			else term_bcol(cunset);
+		}
+		putc_view_char(i);
+	}
+	term_reset();
+}
+
+__private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap){
+	unsigned byc = vm->bytecode[vm->sectionCode+pc];
+	switch( BYTECODE_CMD40(byc) ){
+		default : printf("INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
+		case OP_URANGE: break;
+		case OP_MATCH :  fputs("match", stdout); break;
+		case OP_CHAR  :  fputs("char ", stdout); putc_view_char(BYTECODE_VAL08(byc)); break;
+		case OP_RANGE : printf("range %u", BYTECODE_VAL12(byc)); break;
+		case OP_SPLITF: printf("split %X", pc + BYTECODE_VAL12(byc)); break;
+		case OP_SPLITB: printf("split %X", pc - BYTECODE_VAL12(byc)); break;
+		case OP_SPLIRF: printf("splir %X", pc + BYTECODE_VAL12(byc)); break;
+		case OP_SPLIRB: printf("splir %X", pc - BYTECODE_VAL12(byc)); break;
+		case OP_JMPF  : printf("jmp   %X", pc + BYTECODE_VAL12(byc)); break;
+		case OP_JMPB  : printf("jmp   %X", pc - BYTECODE_VAL12(byc)); break;
+		case OP_NODE  : printf("node  %s::%u", nmap[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
+		case OP_CALL  : printf("call  %s::%u", nmap[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
+		case OP_EXT:
+			switch(BYTECODE_CMD04(byc)){
+				case OPE_SAVE  : printf("save  %u", BYTECODE_VAL08(byc)); break;
+				case OPE_RET   : printf("ret"); break;
+				case OPE_PARENT: printf("parent"); break;
+				default: printf("INTERNAL ERROR CMD04: 0x%X", BYTECODE_CMD04(byc)); break;
+			}
+		break;
+	}
+}
+
+__private void draw_code(revm_s* vm, unsigned pc, const char** nmap){
+	unsigned y = DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1;
+	unsigned const count = vm->bytecode[BYC_CODELEN];
+	unsigned const csel  = 63;
+	if( pc < DBG_CODE_H ){
+		for( unsigned i = 0; i < count && i < DBG_CODE_H; ++i){
+			term_gotoxy(1, y++);
+			if( pc == i ){
+				term_fcol(csel);
+				printf(">");
+			}
+			else{
+				printf(" ");
+			}
+			printf("%04X  ", i);
+			draw_opcode(vm, i, nmap);
+			term_reset();
+		}
+	}
+}
+
 __private char* input(void){
 	term_gotoxy(1, DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1);
 	return readline("> ");
@@ -591,35 +724,26 @@ __private void onend(void){
 
 
 void revm_debug(uint16_t* bytecode, const utf8_t* txt){
-	revmMatch_s ret = {.match = 0, .node = NULL};
-	
+	//revmMatch_s ret = {.match = 0, .node = NULL};
 	revm_s vm;
-	vm.bytecode = bytecode;
-	vm.fn       = &bytecode[bytecode[BYC_SECTION_FN]];
-	vm.range    = &bytecode[bytecode[BYC_SECTION_RANGE]];
-	vm.pc       = 0;
-	vm.stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
-	vm.cstk     = MANY(unsigned, 128);
-	vm.node     = MANY(bcnode_s, 32);
-	vm.start    = bytecode[BYC_START];
-	vm.sp       = txt;
-	
+	revm_ctor(&vm, bytecode, txt);
+	stk_push(&vm, vm.sectionStart, vm.sp);
+	__free const char** nmap = revm_map_name(bytecode);
 	draw_clear();
-	
-	stk_push(&vm, vm.start, vm.sp);
-
-	draw_header(vm.start, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
+	draw_header(vm.sectionStart, bytecode[BYC_RANGE_COUNT], bytecode[BYC_FN_COUNT], m_header(vm.stack)->len);
 	draw_stack(vm.stack, txt);
+	draw_code(&vm, 0, nmap);
+	//draw_range(&vm, 0, -1);
 	//draw node
 	//draw capture
 	//draw code
 	fflush(stdout);
 
-//	input();
+	input();
 	onend();
 //exit(1);
 
-	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
+//	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
 	revm_dtor(&vm);
 }
 

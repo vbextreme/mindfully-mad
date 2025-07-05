@@ -16,10 +16,11 @@
 #define BYC_SECTION_RANGE  0x8
 #define BYC_SECTION_URANGE 0x9
 #define BYC_SECTION_NAME   0xA
-#define BYC_HEADER_SIZE    0xB
+#define BYC_SECTION_CODE   0xB
+#define BYC_HEADER_SIZE    0xC
 
 #define BYTECODE_CMD40(BYTECODE) ((BYTECODE)&0xF000)
-#define BYTECODE_CMD04(BYTECODE) ((BYTECODE)&0xF000)
+#define BYTECODE_CMD04(BYTECODE) ((BYTECODE)&0x0F00)
 #define BYTECODE_VAL12(BYTECODE) ((BYTECODE)&0x0FFF)
 #define BYTECODE_VAL08(BYTECODE)  ((BYTECODE)&0x00FF)
 #define BYTECODE_VAL44(BYTECODE)  ((BYTECODE)&0x0F00)
@@ -66,6 +67,7 @@ typedef struct revmMatch{
 }revmMatch_s;
 
 revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt);
+const char** revm_map_name(const uint16_t* bytecode);
 void revm_debug(uint16_t* bytecode, const utf8_t* txt);
 
 #endif
