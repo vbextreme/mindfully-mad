@@ -687,7 +687,7 @@ __private void draw_cstack(revm_s* vm){
 	}
 }
 
-__private void draw_node(revm_s* vm){
+__private void draw_node(revm_s* vm, const char** nmap){
 	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
 	unsigned ny = DBG_STACKED_H;
 	unsigned count = m_header(vm->node)->len;
@@ -696,7 +696,7 @@ __private void draw_node(revm_s* vm){
 	draw_cls_rect(x, DBG_HEADER_H+2, DBG_NODE_W, DBG_STACKED_H);
 	while( ny-->0 && sc < count){
 		term_gotoxy(x, y--);
-		printf(" [] op:%1u id:%4u", vm->node[sc].op, vm->node[sc].id);
+		printf(" %c [%4d]%s", vm->node[sc].op == NOP_NEW ? '+' : '<', vm->node[sc].id, nmap[vm->node[sc].id]);
 		++sc;
 	}
 }
@@ -845,7 +845,7 @@ __private void redraw(revm_s* vm, const utf8_t* txt, unsigned len, const char** 
 	draw_header(vm->sectionStart, vm->bytecode[BYC_RANGE_COUNT], vm->bytecode[BYC_FN_COUNT], m_header(vm->stack)->len);
 	draw_stack(vm->stack, txt);
 	draw_cstack(vm);
-	draw_node(vm);
+	draw_node(vm, nmap);
 	draw_save(vm, txt);
 	unsigned const sl = m_header(vm->stack)->len;
 	if( sl ){

@@ -91,7 +91,7 @@ __private void def_opchar(recom_s* rc){
 
 //literal: '[^|*+?(){}[].];
 __private void def_literal(recom_s* rc){
-	token_class(rc, "literal", "|*+?(){}[]\0", 0, 0);
+	token_class(rc, "literal", "|*+?(){}[]", 1, 0);
 }
 
 //escaped: '\[|*+?(){}[].\^$]';
