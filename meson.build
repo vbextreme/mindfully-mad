@@ -13,7 +13,7 @@ type = 'executable'
 version = {
   'mmr': meson.project_version().split('.'),
   'str': meson.project_version(),
-  'dsc': 'switch thomson vm to stack vm'
+  'dsc': 'fix call stack use stackptr instead of pc, fix debug view range, fix dbg view code to high to high'
 }
 
 if get_option('eveloper')

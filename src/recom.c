@@ -72,6 +72,7 @@ recrange_s* recom_range_clr(recrange_s* range, uint8_t ch){
 }
 
 recrange_s* recom_range_reverse(recrange_s* range){
+	recom_range_set(range, 0);
 	for( unsigned i = 0; i < 16; ++i ){
 		range->map[i] = ~range->map[i];
 	}
@@ -157,7 +158,22 @@ unsigned recom_fn(recom_s* rc, const char* name, unsigned len){
 	if( addr > UINT16_MAX ) die("function address to long %u", addr);
 	rc->fn[ret].addr = addr;
 	rc->fn[ret].name = str_dup(name, len);
+	rc->fn[ret].fail = recom_label_new(rc);
+	recom_split(rc, rc->fn[ret].fail);
+	rc->currentFN = ret;
 	return ret;
+}
+
+recom_s* recom_fn_prolog(recom_s* rc, const char* name, unsigned store){
+	recom_fn(rc, name, 0);
+	if( store ) recom_node(rc, rc->currentFN);
+	return rc;
+}
+
+recom_s* recom_fn_epilog(recom_s* rc, unsigned stored){
+	if( stored ) recom_parent(rc);
+	recom_ret(rc, rc->currentFN);
+	return rc;
 }
 
 recom_s* recom_calli(recom_s* rc, unsigned ifn){
@@ -176,9 +192,14 @@ recom_s* recom_call(recom_s* rc, const char* name, unsigned len){
 	return rc;
 }
 
-recom_s* recom_ret(recom_s* rc){
+recom_s* recom_ret(recom_s* rc, int fn){
 	unsigned i = m_ipush(&rc->bytecode);
 	rc->bytecode[i] = OP_EXT | OPE_RET;
+	if( fn >= 0 ){
+		recom_label(rc, rc->fn[fn].fail);
+		i = m_ipush(&rc->bytecode);
+		rc->bytecode[i] = OP_EXT | OPE_RET | 0x00FF;
+	}
 	return rc;
 }
 
@@ -242,14 +263,15 @@ uint16_t* recom_make(recom_s* rc){
 	//.section range
 	bc[BYC_SECTION_RANGE] = inc - bc;
 	mforeach(rc->range, i){
-		memcpy(inc, rc->range[i].map, sizeof(uint16_t)*16);
-		inc += 16;
+		memcpy(inc, rc->range[i].map, sizeof rc->range[i].map);
+		inc += (sizeof rc->range[i].map)/2;
 	}
 	//.section urange
 	bc[BYC_SECTION_URANGE] = inc - bc;
 	//.section name
 	bc[BYC_SECTION_NAME] = inc - bc;
 	mforeach(rc->fn, i){
+		dbg_info("");
 		unsigned len = strlen(rc->fn[i].name)+1;
 		memcpy(inc, rc->fn[i].name, len);
 		len = ROUND_UP(len, 2);
@@ -273,10 +295,12 @@ uint16_t* recom_make(recom_s* rc){
 				off = rc->label[it].address - bc;
 			}
 			if( off > 4096 ) die("linker error: jump to long %u", off);
+			//dbg_info("link 0x%X 0x%X", bc, op|off);
 			rc->bytecode[bc] = op | off;
 		}
 	}
 	mforeach(rc->call, it){
+		dbg_info("");
 		long ifn = name_to_ifn(rc, rc->call[it].name);
 		if( ifn == -1 ) die("linker error: unable CALL, unknown function name '%s'", rc->call[it].name);
 		rc->bytecode[rc->call[it].addr] |= ifn & 0x0FFF;

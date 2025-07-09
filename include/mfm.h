@@ -20,5 +20,6 @@ void mfm_lexer_file(mfm_s* mfm, const char* fname);
 void mfm_token_dump(mfm_s* mfm);
 
 uint16_t* regram_make(void);
+uint16_t* regram_test(void);
 
 #endif

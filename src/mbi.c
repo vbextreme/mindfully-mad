@@ -19,8 +19,9 @@ option_s opt[] = {
 };
 
 int main(int argc, char** argv){
-	uint16_t* rxbyc = regram_make();
-revm_debug(rxbyc,(utf8_t*)"/a*(b|z)/");
+	uint16_t* rxbyc = regram_test();// reegram_make();
+//revm_debug(rxbyc,(utf8_t*)"/a*(b|z)/");
+revm_debug(rxbyc,(utf8_t*)"s\"ciao\"");
 exit(0);
 
 	argv_parse(opt, argc, argv);
