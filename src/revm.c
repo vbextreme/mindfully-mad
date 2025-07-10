@@ -2,6 +2,7 @@
 #include <notstd/memory.h>
 #include <mfmrevm.h>
 #include <readline/readline.h>
+#include <notstd/str.h>
 
 /*
 
@@ -281,6 +282,7 @@ typedef struct revm{
 	const utf8_t*  sp;
 	uint32_t       pc;
 	int            ls;
+	uint32_t       bytecodeLen;
 	uint32_t       sectionStart;
 	uint32_t       sectionFn;
 	uint32_t       sectionRange;
@@ -295,13 +297,14 @@ __private revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
 	vm->sectionRange  = bytecode[BYC_SECTION_RANGE];
 	vm->sectionURange = bytecode[BYC_SECTION_URANGE];
 	vm->sectionFn     = bytecode[BYC_SECTION_FN];
+	vm->bytecodeLen   = bytecode[BYC_CODELEN];
 	vm->bytecode = bytecode;
 	vm->fn       = &bytecode[vm->sectionFn];
 	vm->range    = &bytecode[vm->sectionRange];
 	vm->code     = &bytecode[vm->sectionCode];
 	vm->pc       = 0;
 	vm->sp       = txt;
-	vm->stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
+	vm->stack    = MANY(revmStack_s, vm->bytecodeLen);
 	vm->cstk     = MANY(unsigned, 128);
 	vm->node     = MANY(bcnode_s, 32);
 	vm->ls       = -1;
@@ -942,17 +945,29 @@ __private void ast_dump_stdout(reAst_s* ast, const char** nmap, unsigned tab){
 
 typedef enum { DBGMODE_STEP, DBGMODE_CONTINUE } dbgmode_e;
 
+__private long find_bp(uint32_t* bp, uint32_t val){
+	mforeach(bp, i)
+		if( bp[i] == val ) return i;
+	return -1;
+}
+
 void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 	revmMatch_s ret = {.match = 0, .ast = NULL};
 	revm_s vm;
 	revm_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
 	__free const char** nmap = revm_map_name(bytecode);
+	__free uint32_t* bp = MANY(uint32_t, 4);
+
 	unsigned len = strlen((char*)txt);
 	draw_clear();
 	dbgmode_e dmode = DBGMODE_STEP;
 	do{
 		redraw(&vm, txt, len, nmap);
+		unsigned const sl = m_header(vm.stack)->len;
+		if( sl && find_bp(bp, vm.stack[sl-1].pc) >= 0 ){
+			dmode = DBGMODE_STEP;
+		}
 		if( dmode == DBGMODE_STEP ){
 			char* str = prompt();
 			if( !strcmp(str, "s") ){
@@ -960,6 +975,33 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 			}
 			else if( !strcmp(str, "c") ){
 				dmode = DBGMODE_CONTINUE;
+			}
+			else if( !strncmp(str, "bp", 2) ){
+				const char* p = str + 2;
+				p = str_skip_h(p);
+				unsigned ibp = strtoul(p, NULL, 16);
+				if( ibp < vm.bytecodeLen ){
+					unsigned j = m_ipush(&bp);
+					bp[j] = ibp;
+				}
+			}
+			else if( !strncmp(str, "bp", 2) ){
+				const char* p = str + 2;
+				p = str_skip_h(p);
+				unsigned ibp = strtoul(p, NULL, 16);
+				if( ibp < vm.bytecodeLen ){
+					if( find_bp(bp, ibp) < 0 ){
+						unsigned j = m_ipush(&bp);
+						bp[j] = ibp;
+					}
+				}
+			}
+			else if( !strncmp(str, "br", 2) ){
+				const char* p = str + 2;
+				p = str_skip_h(p);
+				unsigned ibp = strtoul(p, NULL, 16);
+				long r = find_bp(bp, ibp);
+				if( r >= 0 ) m_delete(bp, r, 1);
 			}
 			free(str);
 		}
