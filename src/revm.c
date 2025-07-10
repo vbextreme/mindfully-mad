@@ -899,7 +899,9 @@ __private void draw_code(revm_s* vm, unsigned pc, const char** nmap, const utf8_
 }
 
 __private char* prompt(void){
-	term_gotoxy(1, DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1+DBG_INP_H+1);
+	unsigned y =  DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1+DBG_INP_H+1;
+	draw_cls_rect(1, y, DBG_SCREEN_W, DBG_PROMPT_H);
+	term_gotoxy(1, y);
 	return readline("> ");
 }
 
@@ -958,7 +960,6 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 	stk_push(&vm, vm.sectionStart, vm.sp);
 	__free const char** nmap = revm_map_name(bytecode);
 	__free uint32_t* bp = MANY(uint32_t, 4);
-
 
 	unsigned len = strlen((char*)txt);
 	draw_clear();
