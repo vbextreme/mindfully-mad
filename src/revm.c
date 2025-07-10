@@ -261,7 +261,6 @@ regex vm stack based
 */
 
 
-
 typedef struct revmStack{
 	unsigned      pc;
 	const utf8_t* sp;
@@ -289,6 +288,26 @@ typedef struct revm{
 	uint32_t       sectionName;
 	uint32_t       sectionCode;
 }revm_s;
+
+__private revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
+	vm->sectionStart  = bytecode[BYC_START];
+	vm->sectionCode   = bytecode[BYC_SECTION_CODE];
+	vm->sectionRange  = bytecode[BYC_SECTION_RANGE];
+	vm->sectionURange = bytecode[BYC_SECTION_URANGE];
+	vm->sectionFn     = bytecode[BYC_SECTION_FN];
+	vm->bytecode = bytecode;
+	vm->fn       = &bytecode[vm->sectionFn];
+	vm->range    = &bytecode[vm->sectionRange];
+	vm->code     = &bytecode[vm->sectionCode];
+	vm->pc       = 0;
+	vm->sp       = txt;
+	vm->stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
+	vm->cstk     = MANY(unsigned, 128);
+	vm->node     = MANY(bcnode_s, 32);
+	vm->ls       = -1;
+	memset(vm->save, 0, sizeof vm->save);
+	return vm;
+}
 
 __private void stk_push(revm_s* vm, unsigned pc, const utf8_t* sp){
 	unsigned i = m_ipush(&vm->stack);
@@ -374,7 +393,7 @@ __private int vm_exec(revm_s* vm, revmMatch_s* ret){
 			save(vm, 1);
 			memcpy(ret->capture, vm->save, sizeof(const utf8_t*) * (vm->ls+1));
 			ret->match = (vm->ls+1)/2;
-			ret->node  = m_borrowed(vm->node);
+			if( m_header(vm->node)->len ) ret->ast = reast_make(vm->node);
 		return 0;
 		
 		case OP_CHAR:
@@ -441,8 +460,8 @@ __private int vm_exec(revm_s* vm, revmMatch_s* ret){
 					cret(vm, BYTECODE_VAL08(byc));
 				break;
 				
-				case OPE_PARENT:
-					node(vm, NOP_PARENT, 0);
+				case OPE_NODEEX:
+					node(vm, BYTECODE_VAL08(byc), 0);
 					stk_push(vm, vm->pc+1, vm->sp);
 				break;
 			}
@@ -451,27 +470,8 @@ __private int vm_exec(revm_s* vm, revmMatch_s* ret){
 	return -1;
 }
 
-revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
-	vm->sectionStart  = bytecode[BYC_START];
-	vm->sectionCode   = bytecode[BYC_SECTION_CODE];
-	vm->sectionRange  = bytecode[BYC_SECTION_RANGE];
-	vm->sectionURange = bytecode[BYC_SECTION_URANGE];
-	vm->sectionFn     = bytecode[BYC_SECTION_FN];
-	vm->bytecode = bytecode;
-	vm->fn       = &bytecode[vm->sectionFn];
-	vm->range    = &bytecode[vm->sectionRange];
-	vm->code     = &bytecode[vm->sectionCode];
-	vm->pc       = 0;
-	vm->sp       = txt;
-	vm->stack    = MANY(revmStack_s, bytecode[BYC_CODELEN]);
-	vm->cstk     = MANY(unsigned, 128);
-	vm->node     = MANY(bcnode_s, 32);
-	vm->ls       = -1;
-	return vm;
-}
-
 revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt){
-	revmMatch_s ret = {.match = 0, .node = NULL};
+	revmMatch_s ret = {.match = 0, .ast = NULL};
 	revm_s vm;
 	revm_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
@@ -711,7 +711,7 @@ __private void draw_cstack(revm_s* vm){
 	}
 }
 
-__private void draw_node(revm_s* vm, const char** nmap){
+__private void draw_node(revm_s* vm, const char** nmap, const utf8_t* txt){
 	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
 	unsigned ny = DBG_STACKED_H;
 	unsigned count = m_header(vm->node)->len;
@@ -720,7 +720,12 @@ __private void draw_node(revm_s* vm, const char** nmap){
 	draw_cls_rect(x, DBG_HEADER_H+2, DBG_NODE_W, DBG_STACKED_H);
 	while( ny-->0 && sc < count){
 		term_gotoxy(x, y--);
-		printf(" %c [%4d]%s", vm->node[sc].op == NOP_NEW ? '+' : '<', vm->node[sc].id, nmap[vm->node[sc].id]);
+		switch( vm->node[sc].op ){
+			case NOP_NEW    : printf(" + [%4u](%3d)%s %lu", sc, vm->node[sc].id, nmap[vm->node[sc].id], vm->node[sc].sp - txt); break;
+			case NOP_PARENT : printf(" < [%4d] %lu", sc, vm->node[sc].sp - txt); break;
+			case NOP_DISABLE: printf(" ~ [%4u]", sc);
+			case NOP_ENABLE : printf(" & [%4u]", sc);
+		}
 		++sc;
 	}
 }
@@ -734,7 +739,7 @@ __private void draw_save(revm_s* vm, const utf8_t* txt){
 	draw_cls_rect(x, DBG_HEADER_H+2, DBG_NODE_W, DBG_STACKED_H);
 	while( ny-->0 && sc < count){
 		term_gotoxy(x, y--);
-		printf(" $ %lu", vm->save[sc] ? vm->save[sc] - txt : 0);
+		printf(" $(%3u) %ld", sc, vm->save[sc] ? vm->save[sc] - txt : -1);
 		++sc;
 	}
 }
@@ -800,12 +805,13 @@ __private void draw_input(revm_s* vm, const utf8_t* txt, unsigned len, int oncol
 			}
 			putc_view_char(txt[i]);
 			term_reset();
+			offx = i-low;
 		}
 		else{
 			putc_view_char(txt[i]);
 		}
 	}
-	term_gotoxy(offx+1, y+1);
+	term_gotoxy(1+offx, y+1);
 	switch( oncol ){
 		case 0: term_fcol(160); break;
 		case 1: term_fcol(46); break;
@@ -829,7 +835,7 @@ __private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap, unsigned 
 		case OP_URANGE: break;
 		case OP_MATCH :  fputs("match", stdout); break;
 		case OP_CHAR  :
-			fputs("char ", stdout); putc_view_char(BYTECODE_VAL08(byc)); 
+			fputs("char  ", stdout); putc_view_char(BYTECODE_VAL08(byc)); 
 			if( curpc == pc ){
 				term_reset();
 				draw_input(vm, txt, len, BYTECODE_VAL08(byc) == *vm->stack[m_header(vm->stack)->len-1].sp);
@@ -847,7 +853,13 @@ __private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap, unsigned 
 			switch(BYTECODE_CMD04(byc)){
 				case OPE_SAVE  : printf("save  %u", BYTECODE_VAL08(byc)); break;
 				case OPE_RET   : printf("ret   %u", BYTECODE_VAL08(byc)); break;
-				case OPE_PARENT: printf("parent"); break;
+				case OPE_NODEEX:
+					switch( BYTECODE_VAL08(byc) ){
+						case NOP_PARENT : printf("parent"); break;
+						case NOP_DISABLE: printf("ndisable"); break;
+						case NOP_ENABLE : printf("nparent"); break;
+					}
+				break;
 				default: printf("INTERNAL ERROR CMD04: 0x%X", BYTECODE_CMD04(byc)); break;
 			}
 		break;
@@ -898,7 +910,7 @@ __private void redraw(revm_s* vm, const utf8_t* txt, unsigned len, const char** 
 	draw_header(vm->sectionStart, vm->bytecode[BYC_RANGE_COUNT], vm->bytecode[BYC_FN_COUNT], m_header(vm->stack)->len);
 	draw_stack(vm->stack, txt);
 	draw_cstack(vm);
-	draw_node(vm, nmap);
+	draw_node(vm, nmap, txt);
 	draw_save(vm, txt);
 	unsigned const sl = m_header(vm->stack)->len;
 	if( sl ){
@@ -908,23 +920,50 @@ __private void redraw(revm_s* vm, const utf8_t* txt, unsigned len, const char** 
 	fflush(stdout);
 }
 
+__private void ast_dump_stdout(reAst_s* ast, const char** nmap, unsigned tab){
+	for( unsigned i = 0; i < tab; ++i ){
+		putchar(' ');
+		putchar(' ');
+	}
+	if( m_header(ast->child)->len ){
+		printf("<%s>\n", ast->id == REVM_NODE_START ? "_start_": nmap[ast->id]);
+		mforeach(ast->child,i){
+			ast_dump_stdout(&ast->child[i], nmap, tab+1);
+		}
+	}
+	else{
+		printf("<%s> '", ast->id == REVM_NODE_START ? "_start_": nmap[ast->id]);
+		for( unsigned i = 0; i < ast->len; ++i ){
+			putc_view_char(ast->sp[i]);
+		}
+		printf("'\n");
+	}
+}
+
+typedef enum { DBGMODE_STEP, DBGMODE_CONTINUE } dbgmode_e;
+
 void revm_debug(uint16_t* bytecode, const utf8_t* txt){
-	revmMatch_s ret = {.match = 0, .node = NULL};
+	revmMatch_s ret = {.match = 0, .ast = NULL};
 	revm_s vm;
 	revm_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
 	__free const char** nmap = revm_map_name(bytecode);
 	unsigned len = strlen((char*)txt);
 	draw_clear();
-
-	while( 1 ){
+	dbgmode_e dmode = DBGMODE_STEP;
+	do{
 		redraw(&vm, txt, len, nmap);
-		prompt();
-		if( !stk_pop(&vm) ) break;
-		//redraw(&vm, txt, nmap);
-		//input();
-		if( !vm_exec(&vm, &ret) ) break;
-	}
+		if( dmode == DBGMODE_STEP ){
+			char* str = prompt();
+			if( !strcmp(str, "s") ){
+				dmode = DBGMODE_STEP;
+			}
+			else if( !strcmp(str, "c") ){
+				dmode = DBGMODE_CONTINUE;
+			}
+			free(str);
+		}
+	}while( stk_pop(&vm) && vm_exec(&vm, &ret) );
 
 	term_cls();
 	if( ret.match == 0 ){
@@ -940,6 +979,7 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 			unsigned len = ret.capture[en] - ret.capture[st];
 			printf("capture[0]: '%.*s'\n", len, ret.capture[st]);
 		}
+		if( ret.ast ) ast_dump_stdout(ret.ast, nmap, 0);
 	}
 	revm_dtor(&vm);
 }

@@ -19,7 +19,6 @@ void mfm_lexer(mfm_s* mfm, const char* fname, char* src);
 void mfm_lexer_file(mfm_s* mfm, const char* fname);
 void mfm_token_dump(mfm_s* mfm);
 
-uint16_t* regram_make(void);
-uint16_t* regram_test(void);
+uint16_t* reasmgram_make(void);
 
 #endif

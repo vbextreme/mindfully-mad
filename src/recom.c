@@ -79,6 +79,14 @@ recrange_s* recom_range_reverse(recrange_s* range){
 	return range;
 }
 
+recrange_s* recom_range_str_set(recrange_s* range, const char* accept, unsigned rev){
+	for( unsigned i = 0; accept[i]; ++i ){
+		recom_range_set(range, accept[i]);
+	}
+	if( rev ) recom_range_reverse(range);
+	return range;
+}
+
 unsigned recom_range_add(recom_s* rec, recrange_s* range){
 	mforeach(rec->range, it){
 		if( !memcmp(rec->range[it].map, range->map, sizeof range->map) ){
@@ -106,11 +114,13 @@ __private reclabel_s* lbl_ctor(reclabel_s* lbl){
 unsigned recom_label_new(recom_s* rc){
 	unsigned ret = m_ipush(&rc->label);
 	lbl_ctor(&rc->label[ret]);
+	dbg_info("label + %u", ret);
 	return ret;
 }
 
 unsigned recom_label(recom_s* rc, unsigned lbl){
 	rc->label[lbl].address = m_header(rc->bytecode)->len;
+	dbg_info("label ! %u", lbl);
 	return lbl;
 }
 
@@ -153,11 +163,16 @@ recom_s* recom_node(recom_s* rc, uint16_t id){
 }
 
 unsigned recom_fn(recom_s* rc, const char* name, unsigned len){
+	char* tmpname = str_dup(name, len);
+	mforeach(rc->fn, i){
+		if( !strcmp(rc->fn[i].name, tmpname) ) die("redefinition function %s", tmpname);
+	}
 	unsigned ret = m_ipush(&rc->fn);
+	dbg_info("fn[%u] '%s'", ret, tmpname);
 	unsigned addr =  m_header(rc->bytecode)->len;
 	if( addr > UINT16_MAX ) die("function address to long %u", addr);
 	rc->fn[ret].addr = addr;
-	rc->fn[ret].name = str_dup(name, len);
+	rc->fn[ret].name = tmpname;
 	rc->fn[ret].fail = recom_label_new(rc);
 	recom_split(rc, rc->fn[ret].fail);
 	rc->currentFN = ret;
@@ -171,7 +186,7 @@ recom_s* recom_fn_prolog(recom_s* rc, const char* name, unsigned store){
 }
 
 recom_s* recom_fn_epilog(recom_s* rc, unsigned stored){
-	if( stored ) recom_parent(rc);
+	if( stored ) recom_nodeex(rc, NOP_PARENT);
 	recom_ret(rc, rc->currentFN);
 	return rc;
 }
@@ -200,11 +215,12 @@ recom_s* recom_ret(recom_s* rc, int fn){
 		i = m_ipush(&rc->bytecode);
 		rc->bytecode[i] = OP_EXT | OPE_RET | 0x00FF;
 	}
+	dbg_info("ret %d", fn);
 	return rc;
 }
 
-recom_s* recom_parent(recom_s* rc){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_EXT | OPE_PARENT;
+recom_s* recom_nodeex(recom_s* rc, nodeOP_e op){
+	rc->bytecode[m_ipush(&rc->bytecode)] = OP_EXT | OPE_NODEEX | op;
 	return rc;
 }
 
@@ -271,7 +287,6 @@ uint16_t* recom_make(recom_s* rc){
 	//.section name
 	bc[BYC_SECTION_NAME] = inc - bc;
 	mforeach(rc->fn, i){
-		dbg_info("");
 		unsigned len = strlen(rc->fn[i].name)+1;
 		memcpy(inc, rc->fn[i].name, len);
 		len = ROUND_UP(len, 2);
@@ -281,7 +296,9 @@ uint16_t* recom_make(recom_s* rc){
 	
 	//linker
 	mforeach(rc->label, it){
-		if( rc->label[it].address == -1 ) die("linker error: unknow label address");
+		if( rc->label[it].address == -1 ){
+			die("linker error: unknow label[%u] address, need for resolve byc 0x%lX(%lu)", it, rc->label[it].address, rc->label[it].address);
+		}
 		mforeach(rc->label[it].resolve, i){
 			const unsigned bc  = rc->label[it].resolve[i];
 			uint16_t byc = rc->bytecode[bc];
@@ -300,7 +317,6 @@ uint16_t* recom_make(recom_s* rc){
 		}
 	}
 	mforeach(rc->call, it){
-		dbg_info("");
 		long ifn = name_to_ifn(rc, rc->call[it].name);
 		if( ifn == -1 ) die("linker error: unable CALL, unknown function name '%s'", rc->call[it].name);
 		rc->bytecode[rc->call[it].addr] |= ifn & 0x0FFF;

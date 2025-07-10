@@ -42,6 +42,7 @@ recrange_s* recom_range_ctor(recrange_s* range);
 recrange_s* recom_range_set(recrange_s* range, uint8_t ch);
 recrange_s* recom_range_clr(recrange_s* range, uint8_t ch);
 recrange_s* recom_range_reverse(recrange_s* range);
+recrange_s* recom_range_str_set(recrange_s* range, const char* accept, unsigned rev);
 unsigned recom_range_add(recom_s* rec, recrange_s* range);
 recom_s* recom_range(recom_s* rc, uint16_t val);
 unsigned recom_label_new(recom_s* rc);
@@ -57,7 +58,7 @@ recom_s* recom_fn_epilog(recom_s* rc, unsigned stored);
 recom_s* recom_calli(recom_s* rc, unsigned ifn);
 recom_s* recom_call(recom_s* rc, const char* name, unsigned len);
 recom_s* recom_ret(recom_s* rc, int fn);
-recom_s* recom_parent(recom_s* rc);
+recom_s* recom_nodeex(recom_s* rc, nodeOP_e op);
 recom_s* recom_start(recom_s* rc, int search);
 uint16_t* recom_make(recom_s* rc);
 
@@ -72,6 +73,7 @@ uint16_t* recom_make(recom_s* rc);
 #define RRANGE()    do{ recom_range_ctor(&TMPRANGE); }while(0)
 #define RRSET(CH)   do{ recom_range_set(&TMPRANGE, CH); }while(0)
 #define RRREV(CH)   do{ recom_range_reverse(&TMPRANGE); }while(0)
+#define RRSTR(S,R)  do{ recom_range_str_set(&TMPRANGE, S, R);}while(0)
 #define RRADD()     recom_range_add(RECOM, &TMPRANGE)
 #define RANGE(ID)   do{ recom_range(RECOM, ID); }while(0)
 #define USELBL(N)   unsigned L[N]; for( unsigned i = 0; i < N; ++i ) L[i] = recom_label_new(RECOM)
@@ -84,10 +86,12 @@ uint16_t* recom_make(recom_s* rc);
 #define NODE(ID)    do{ recom_node(RECOM, ID); }while(0)
 #define FN(N, STRE) do{ recom_fn_prolog(RECOM, N, STRE);} while(0)
 #define CALLI(ID)   do{ recom_calli(RECOM, ID); }while(0)
-#define CALL(N,L)   do{ recom_call(RECOM, N, L); }while(0)
+#define CALL(N)     do{ recom_call(RECOM, N, strlen(N)); }while(0)
 #define RET(STRE)   do{ recom_fn_epilog(RECOM, STRE); }while(0)
 #define RETI(ID)    do{ recom_ret(RECOM,ID); }while(0)
-#define PARENT()    do{ recom_parent(RECOM); }while(0)
+#define PARENT()    do{ recom_nodeex(RECOM, NOP_PARENT); }while(0)
+#define NDISABLE()  do{ recom_nodeex(RECOM, NOP_DISABLE); }while(0)
+#define NENABLE()   do{ recom_nodeex(RECOM, NOP_ENABLE); }while(0)
 #define START(S)    do{ recom_start(RECOM, S); }while(0)
 #define MAKE()      recom_make(RECOM)
 

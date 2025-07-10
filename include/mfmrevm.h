@@ -29,6 +29,7 @@
 #define BYTECODE_FLAG_MULTILINE 0x02
 
 #define REVM_MAX_CAPTURE 128
+#define REVM_NODE_START  UINT16_MAX
 
 typedef enum{
 	OP_MATCH  = 0x0000,
@@ -44,14 +45,16 @@ typedef enum{
 	OP_NODE   = 0xA000,
 	OP_CALL   = 0xE000,
 	OP_EXT    = 0xF000,
-	OPE_SAVE  = 0x0000,
-	OPE_RET   = 0x0100,
-	OPE_PARENT= 0x0200,
+	OPE_SAVE   = 0x0000,
+	OPE_RET    = 0x0100,
+	OPE_NODEEX = 0x0200,
 }revmOP_e;
 
 typedef enum{
 	NOP_NEW,
-	NOP_PARENT
+	NOP_PARENT,
+	NOP_DISABLE,
+	NOP_ENABLE
 }nodeOP_e;
 
 typedef struct bcnode{
@@ -60,8 +63,16 @@ typedef struct bcnode{
 	const utf8_t* sp;
 }bcnode_s;
 
+typedef struct reAst{
+	struct reAst* parent;
+	struct reAst* child;
+	const utf8_t* sp;
+	unsigned      len;
+	uint16_t      id;
+}reAst_s;
+
 typedef struct revmMatch{
-	bcnode_s*     node;
+	reAst_s*      ast;
 	const utf8_t* capture[REVM_MAX_CAPTURE * 2];
 	int           match;
 }revmMatch_s;
@@ -69,6 +80,8 @@ typedef struct revmMatch{
 revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt);
 const char** revm_map_name(const uint16_t* bytecode);
 void revm_debug(uint16_t* bytecode, const utf8_t* txt);
+
+reAst_s* reast_make(bcnode_s* node);
 
 #endif
 
