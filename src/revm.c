@@ -959,6 +959,7 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 	__free const char** nmap = revm_map_name(bytecode);
 	__free uint32_t* bp = MANY(uint32_t, 4);
 
+
 	unsigned len = strlen((char*)txt);
 	draw_clear();
 	dbgmode_e dmode = DBGMODE_STEP;
