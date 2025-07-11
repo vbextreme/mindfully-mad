@@ -281,7 +281,7 @@ __private void def_fnname(recom_s* rc){
 __private void def_decfn(recom_s* rc){
 	INIT(rc);
 	FN("decfn", 1);
-	USELBL(5);
+	USELBL(4);
 					CALL("fn");
 					SPLIT(L[1]);
 					CALL("plus");
@@ -291,7 +291,7 @@ __private void def_decfn(recom_s* rc){
 					CALL("fnname");
 					JMP(L[2]);
 	LABEL(L[3]);	ERROR(1, LIPSASM_ERROR_INVALID_FUNCTION_NAME);
-					RET(1);
+	LABEL(L[2]);	RET(1);
 }
 
 //endcmd    : sep? comment

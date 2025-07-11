@@ -26,7 +26,7 @@ void str_toupper(char* dst, const char* str);
 void str_tolower(char* dst, const char* str);
 void str_tr(char* str, const char* find, const char replace);
 const char* str_tok(const char* str, const char* delimiter, int anydel, __out unsigned* len, __out unsigned* next);
-char** str_split(const char* str, const char* delimiter, int anydel);
+char** str_splitin(char* str, const char* delimiter, int anydel);
 void str_insch(char* dst, const char ch);
 void str_ins(char* dst, const char* restrict src, size_t len);
 void str_del(char* dst, size_t len);

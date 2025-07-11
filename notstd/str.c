@@ -113,8 +113,20 @@ const char* str_tok(const char* str, const char* delimiter, int anydel, __out un
 	if( !*begin ) return begin;
 	const char* sn = anydel ? str_anyof(begin, delimiter) : str_find(begin, delimiter);
 	*len = sn - begin;
-	*next += *sn ? *len + strlen(delimiter) : *len;
+	unsigned inc = anydel ? 1: strlen(delimiter);
+	*next += *sn ? *len + inc : *len;
 	return begin;
+}
+
+char** str_splitin(char* str, const char* delimiter, int anydel){
+	unsigned len;
+	unsigned next = 0;
+	char** ret = MANY(char*, 8);
+	while( *(str=(char*)str_tok(str, delimiter, anydel, &len, &next)) ){
+		str[len] = 0;
+		ret = m_push(ret, &str);
+	}
+	return ret;
 }
 
 void str_insch(char* dst, const char ch){

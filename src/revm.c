@@ -632,6 +632,20 @@ __private void term_cline(unsigned len){
 #define DBG_NODE_W    (DBG_SCREEN_W/4-1)
 #define DBG_CAPTURE_W (DBG_SCREEN_W/4-1)
 
+typedef enum { DCMD_SUSPEND, DCMD_STEP, DCMD_CONTINUE, DCMD_QUIT, DCMD_BREAKPOINT, DCMD_BREAKREMOVE } dbgcommand_e;
+
+typedef struct lipsdbg{
+	lips_s        vm;
+	const utf8_t* source;
+	const char**  nmap;
+	uint32_t*     breakpoint;
+	dbgcommand_e  run;
+	unsigned      srclen;
+	uint32_t      curstk;
+}lipsdbg_s;
+
+typedef void (*dbgaction_f)(lipsdbg_s*, char** args);
+
 __private void putc_view_char(unsigned ch){
 	fputs(cast_view_char(ch, 1), stdout);
 }
@@ -928,17 +942,16 @@ __private void onend(void){
 	fflush(stdout);
 }
 
-__private void redraw(lips_s* vm, const utf8_t* txt, unsigned len, const char** nmap){
+__private void redraw(lipsdbg_s* l){
 	draw_range_clr();
-	draw_header(vm->sectionStart, vm->bytecode[BYC_RANGE_COUNT], vm->bytecode[BYC_FN_COUNT], m_header(vm->stack)->len);
-	draw_stack(vm->stack, txt);
-	draw_cstack(vm);
-	draw_node(vm, nmap, txt);
-	draw_save(vm, txt);
-	unsigned const sl = m_header(vm->stack)->len;
-	if( sl ){
-		draw_input(vm, txt, len, -1);
-		draw_code(vm, vm->stack[sl-1].pc, nmap, txt, len);
+	draw_header(l->vm.sectionStart, l->vm.bytecode[BYC_RANGE_COUNT], l->vm.bytecode[BYC_FN_COUNT], l->curstk);
+	draw_stack(l->vm.stack, l->source);
+	draw_cstack(&l->vm);
+	draw_node(&l->vm, l->nmap, l->source);
+	draw_save(&l->vm, l->source);
+	if( l->curstk ){
+		draw_input(&l->vm, l->source, l->srclen, -1);
+		draw_code(&l->vm, l->vm.stack[l->curstk-1].pc, l->nmap, l->source, l->srclen);
 	}
 	fflush(stdout);
 }
@@ -988,7 +1001,6 @@ __private void ast_dump_dot(lipsAst_s* ast, const char** nmap, FILE* f){
 	fclose(f);
 }
 
-typedef enum { DBGMODE_STEP, DBGMODE_CONTINUE } dbgmode_e;
 
 __private long find_bp(uint32_t* bp, uint32_t val){
 	mforeach(bp, i)
@@ -996,67 +1008,133 @@ __private long find_bp(uint32_t* bp, uint32_t val){
 	return -1;
 }
 
+__private void action_reuse(__unused lipsdbg_s* l, __unused char** args){}
+
+__private void action_step(lipsdbg_s* l, __unused char** args){
+	l->run = DCMD_STEP;
+}
+
+__private void action_continue(lipsdbg_s* l, __unused char** args){
+	l->run = DCMD_CONTINUE;
+}
+
+__private void action_quit(lipsdbg_s* l, __unused char** args){
+	l->run = DCMD_QUIT;
+}
+
+__private void action_breakpoint(lipsdbg_s* l, char** args){
+	unsigned ibp = strtoul(args[1], NULL, 16);
+	if( ibp < l->vm.bytecodeLen && find_bp(l->breakpoint, ibp) < 0 ){
+		unsigned j = m_ipush(&l->breakpoint);
+		l->breakpoint[j] = ibp;
+	}
+}
+
+__private void action_breakremove(lipsdbg_s* l, char** args){
+	unsigned ibp = strtoul(args[1], NULL, 16);
+	long ir = find_bp(l->breakpoint, ibp);
+	if( ir >= 0 ) m_delete(l->breakpoint, ir, 1);
+}
+
+typedef struct cmdmap{
+	const char* shr;
+	const char* lng;
+	dbgaction_f act;
+	unsigned    nam;
+}cmdmap_s;
+
+cmdmap_s CMD[] = {{
+		.shr = "",
+		.lng = "",
+		.act = action_reuse,
+		.nam = 0
+	},{
+		.shr = "s",
+		.lng = "step",
+		.act = action_step,
+		.nam = 0
+	},{
+		.shr = "c",
+		.lng = "continue",
+		.act = action_continue,
+		.nam = 0
+	},{
+		.shr = "q",
+		.lng = "quit",
+		.act = action_quit,
+		.nam = 0
+	},{
+		.shr = "b",
+		.lng = "breakpoint",
+		.act = action_breakpoint,
+		.nam = 1
+	},{
+	},{
+		.shr = "br",
+		.lng = "breakremove",
+		.act = action_breakremove,
+		.nam = 1
+	}
+};
+
+long debug_command_arg_address(const char* from, unsigned byclen){
+	unsigned ret = strtoul(from, NULL, 16);
+	return ret < byclen ? ret: -1;
+}
+
+__private void debug_command(lipsdbg_s* l){
+	if( l->curstk && find_bp(l->breakpoint, l->vm.stack[l->curstk].pc) >= 0 ){
+		l->run = DCMD_STEP;
+	}
+	else if( l->run == DCMD_CONTINUE ){
+		return;
+	}
+	
+	do{
+		char* inp = prompt();
+		char** args = str_splitin(inp, " ", 0);
+		if( m_header(args)->len == 0 ){
+			unsigned i = m_ipush(&args);
+			args[i] = inp;
+		}
+		iassert(m_header(args)->len);
+		for( unsigned i = 0; i < sizeof_vector(CMD); ++i ){
+			if( !strcmp(args[0], CMD[i].shr) || !strcmp(args[0], CMD[i].lng) ){
+				if( CMD[i].nam == m_header(args)->len-1 ) CMD[i].act(l, args);
+				break;
+			}
+		}
+		free(inp);
+		m_free(args);
+	}while( l->run == DCMD_SUSPEND );
+}
+
 int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
 	ret->match = 0;
 	ret->ast   = NULL;
 	ret->err   = NULL;
+	
+	lipsdbg_s l;
+	lips_ctor(&l.vm, bytecode, txt);
+	stk_push(&l.vm, l.vm.sectionStart, l.vm.sp);
+	l.nmap = lips_map_name(bytecode);
+	l.breakpoint = MANY(uint32_t, 4);
+	l.source = txt;
+	l.srclen = strlen((char*)txt);
+	l.run = DCMD_SUSPEND;
 
-	lips_s vm;
-	lips_ctor(&vm, bytecode, txt);
-	stk_push(&vm, vm.sectionStart, vm.sp);
-	__free const char** nmap = lips_map_name(bytecode);
-	__free uint32_t* bp = MANY(uint32_t, 4);
-
-	unsigned len = strlen((char*)txt);
 	draw_clear();
-	dbgmode_e dmode = DBGMODE_STEP;
 	do{
-		redraw(&vm, txt, len, nmap);
-		unsigned const sl = m_header(vm.stack)->len;
-		if( sl && find_bp(bp, vm.stack[sl-1].pc) >= 0 ){
-			dmode = DBGMODE_STEP;
-		}
-		if( dmode == DBGMODE_STEP ){
-			char* str = prompt();
-			if( !strcmp(str, "s") ){
-				dmode = DBGMODE_STEP;
-			}
-			else if( !strcmp(str, "c") ){
-				dmode = DBGMODE_CONTINUE;
-			}
-			else if( !strncmp(str, "bp", 2) ){
-				const char* p = str + 2;
-				p = str_skip_h(p);
-				unsigned ibp = strtoul(p, NULL, 16);
-				if( ibp < vm.bytecodeLen ){
-					unsigned j = m_ipush(&bp);
-					bp[j] = ibp;
-				}
-			}
-			else if( !strncmp(str, "bp", 2) ){
-				const char* p = str + 2;
-				p = str_skip_h(p);
-				unsigned ibp = strtoul(p, NULL, 16);
-				if( ibp < vm.bytecodeLen ){
-					if( find_bp(bp, ibp) < 0 ){
-						unsigned j = m_ipush(&bp);
-						bp[j] = ibp;
-					}
-				}
-			}
-			else if( !strncmp(str, "br", 2) ){
-				const char* p = str + 2;
-				p = str_skip_h(p);
-				unsigned ibp = strtoul(p, NULL, 16);
-				long r = find_bp(bp, ibp);
-				if( r >= 0 ) m_delete(bp, r, 1);
-			}
-			free(str);
-		}
-	}while( stk_pop(&vm) && vm_exec(&vm, ret) );
+		l.curstk = m_header(l.vm.stack)->len;
+		redraw(&l);
+		debug_command(&l);
+		if( l.run == DCMD_QUIT ) break;
+	}while( stk_pop(&l.vm) && vm_exec(&l.vm, ret) );
 	term_cls();
-	if( ret->match < 1 ) ret->err = m_borrowed(vm.errors);
-	lips_dtor(&vm);
+	if( ret->match < 1 ) ret->err = m_borrowed(l.vm.errors);
+	lips_dtor(&l.vm);
+	m_free(l.nmap);
+	m_free(l.breakpoint);
 	return ret->match;
 }
 
@@ -1072,7 +1150,7 @@ void lips_dump_capture(lipsMatch_s* m, FILE* f){
 			unsigned st = i*2;
 			unsigned en = st+1;
 			unsigned len = m->capture[en] - m->capture[st];
-			fprintf(f, "capture[0]: '%.*s'\n", len, m->capture[st]);
+			fprintf(f, "<capture%u>%.*s</capture%u>\n", i, len, m->capture[st], i);
 		}
 	}
 }
