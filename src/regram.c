@@ -5,9 +5,11 @@
 
 /*
 GRAMMAR: lipsasm;
-ERRRORS[1]: 'apsected + or -'
-ERRORSS[2]: 'aspected colon after label or function'
-ERRORSS[3]: 'invalid label name'
+
+ERROR[0]: 'unaspected token'
+ERROR[1]: 'apsected + or -'
+ERROR[2]: 'aspected colon after label or function'
+ERROR[3]: 'invalid label name'
 
 num   : '[0-9]+';
 word  : '[a-zA-Z_]+[a-zA-Z0-9]*';
@@ -63,15 +65,17 @@ command: sep? cmdfn
 progline-: emptyline
          | sep? comment
          | command
+         | $[4]
          ;
 
 program: progline+;
 _start_: program;
 */
 
-#define LIPSASM_ERROR_ASPECTED_STORE_FN     0x01
-#define LIPSASM_ERROR_ASPECTED_COLON        0x02
+#define LIPSASM_ERROR_ASPECTED_STORE_FN  0x01
+#define LIPSASM_ERROR_ASPECTED_COLON     0x02
 #define LIPSASM_ERROR_INVALID_LABEL_NAME 0x03
+#define LIPSASM_ERROR_UNASPECTED_TOKEN   0x04
 
 __private void token_class(recom_s* rc, const char* fnname, const char* accept, unsigned rev, unsigned store){
 	INIT(rc);
@@ -447,12 +451,13 @@ __private void def_command(recom_s* rc){
 //progline-: emptyline
 //         | sep? comment
 //         | command
+//         | $[4]
 //         ;
 __private void def_progline(recom_s* rc){
 	INIT(rc);
 	FN("progline", 0);
-	USELBL(4);
-	SPLIT(L[1]);
+	USELBL(5);
+					SPLIT(L[1]);
 					CALL("emptyline");
 					JMP(L[0]);
 	LABEL(L[1]);	SPLIT(L[2]);
@@ -460,7 +465,10 @@ __private void def_progline(recom_s* rc){
 					CALL("sep");
 	LABEL(L[3]);	CALL("comment");
 					JMP(L[0]);
-	LABEL(L[2]);	CALL("command");
+	LABEL(L[2]);	SPLIT(L[4]);
+					CALL("command");
+					JMP(L[0]);
+	LABEL(L[4]);	ERROR(1, LIPSASM_ERROR_UNASPECTED_TOKEN);
 	LABEL(L[0]);	RET(0);
 }
 
