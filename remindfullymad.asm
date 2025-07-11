@@ -1,3 +1,4 @@
+@
 ;grammar test
 fn.num: node new
 	range 1

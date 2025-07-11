@@ -6,10 +6,11 @@
 /*
 GRAMMAR: lipsasm;
 
-ERROR[0]: 'unaspected token'
 ERROR[1]: 'apsected + or -'
 ERROR[2]: 'aspected colon after label or function'
 ERROR[3]: 'invalid label name'
+ERROR[4]: 'unaspected token'
+ERROR[5]: 'invalid argument'
 
 num   : '[0-9]+';
 word  : '[a-zA-Z_]+[a-zA-Z0-9]*';
@@ -47,6 +48,7 @@ decrange  : dec dot range '[' num ']' sep? colon sep? chclass endcmd
 arg   : char
       | num
       | word
+      | $[5]
       ;
 cmdsym: word endcmd;
 cmdarg: word sep arg endcmd;
@@ -76,6 +78,7 @@ _start_: program;
 #define LIPSASM_ERROR_ASPECTED_COLON     0x02
 #define LIPSASM_ERROR_INVALID_LABEL_NAME 0x03
 #define LIPSASM_ERROR_UNASPECTED_TOKEN   0x04
+#define LIPSASM_ERROR_INVALID_ARGUMENT   0x05
 
 __private void token_class(recom_s* rc, const char* fnname, const char* accept, unsigned rev, unsigned store){
 	INIT(rc);
@@ -355,18 +358,22 @@ __private void def_decrange(recom_s* rc){
 //arg   : char
 //      | num
 //      | word
+//      | $p[5]
 //      ;
 __private void def_arg(recom_s* rc){
 	INIT(rc);
 	FN("arg", 1);
-	USELBL(3);
+	USELBL(4);
 					SPLIT(L[1]);
 					CALL("char");
 					JMP(L[0]);
 	LABEL(L[1]);	SPLIT(L[2]);
 					CALL("num");
 					JMP(L[0]);
-	LABEL(L[2]);	CALL("word");
+	LABEL(L[2]);	SPLIT(L[3]);
+					CALL("word");
+					JMP(L[0]);
+	LABEL(L[3]);	ERROR(1, LIPSASM_ERROR_INVALID_ARGUMENT);
 	LABEL(L[0]);	RET(1);
 }
 

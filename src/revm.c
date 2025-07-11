@@ -883,7 +883,7 @@ __private void draw_opcode(lips_s* vm, unsigned pc, const char** nmap, unsigned 
 		case OP_SPLIRB: printf("splir %X", pc - BYTECODE_VAL12(byc)); break;
 		case OP_JMPF  : printf("jmp   %X", pc + BYTECODE_VAL12(byc)); break;
 		case OP_JMPB  : printf("jmp   %X", pc - BYTECODE_VAL12(byc)); break;
-		case OP_NODE  : printf("node  %s::%u", nmap[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
+		case OP_NODE  : printf("node  new::%s::%u", nmap[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
 		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), nmap[BYTECODE_VAL12(byc)], vm->fn[BYTECODE_VAL12(byc)]); break;
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
@@ -891,11 +891,12 @@ __private void draw_opcode(lips_s* vm, unsigned pc, const char** nmap, unsigned 
 				case OPE_RET   : printf("ret   %u", BYTECODE_VAL08(byc)); break;
 				case OPE_NODEEX:
 					switch( BYTECODE_VAL08(byc) ){
-						case NOP_PARENT : printf("parent"); break;
-						case NOP_DISABLE: printf("ndisable"); break;
-						case NOP_ENABLE : printf("nparent"); break;
+						case NOP_PARENT : printf("node   parent"); break;
+						case NOP_DISABLE: printf("node   disable"); break;
+						case NOP_ENABLE : printf("node   enable"); break;
 					}
 				break;
+				case OPE_ERROR: printf("error %u", BYTECODE_VAL08(byc)); break;
 				default: printf("INTERNAL ERROR CMD04: 0x%X", BYTECODE_CMD04(byc)); break;
 			}
 		break;

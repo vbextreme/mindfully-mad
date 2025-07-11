@@ -33,7 +33,7 @@
 
 #define LIPS_ERROR_DIE 0x80
 
-#define LIPS_ERR_UNKNOW_SYMBOL 0x00
+#define LIPS_ERR_UNKNOW_SYMBOL 0x7F
 
 typedef enum{
 	OP_MATCH  = 0x0000,
