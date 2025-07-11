@@ -18,6 +18,7 @@ typedef enum{
 	OPT_dump_capture,
 	OPT_dump_ast_file,
 	OPT_dump_ast_dot,
+	OPT_E,
 	OPT_h
 }options_e;
 
@@ -26,11 +27,27 @@ option_s opt[] = {
 	{'\0', "--lipsasm-gram" , "use builtin lips asm grammar"                           ,                          OPT_NOARG, 0, NULL},
 	{ 's', "--source"       , "source file"                                            ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
 	{ 'd', "--debug"        , "debug"                                                  ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dump-capture" , "dump capture to file, pass stdout for write on terminal",                          OPT_PATH , 0, NULL},
-	{'\0', "--dump-ast-file", "dump ast to file, pass stdout for write on terminal"    ,                          OPT_PATH , 0, NULL},
-	{'\0', "--dump-ast-dot" , "dump ast in dot format to a file"                       ,                          OPT_PATH , 0, NULL},
+	{'\0', "--dump-capture" , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-file", "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-dot" , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
+	{ 'E', "--dump_error"   , "display error, file accept stdout/stderr"               ,                           OPT_PATH, 0, NULL},
 	{ 'h', "--help"         , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
+
+__private FILE* argfopen(const char* path, const char* mode){
+	if( !strcmp(path, "stdout") ) return stdout;
+	if( !strcmp(path, "stderr") ) return stderr;
+	FILE* ret = fopen(path, mode);
+	if( !ret ) die("unable to open file '%s': %m", path);
+	return ret;
+}
+
+__private void argfclose(FILE* f){
+	if( f == stdout ) return;
+	if( f == stderr ) return;
+	if( !f ) return;
+	fclose(f);
+}
 
 int main(int argc, char** argv){
 	__free uint16_t* grambyc = NULL;
@@ -81,22 +98,24 @@ int main(int argc, char** argv){
 			lips_match(grambyc, source, &m);
 		}
 		if( opt[OPT_dump_capture].set ){
-			FILE* out = strcmp(opt[OPT_dump_capture].value[it].str, "stdout") ? fopen(opt[OPT_dump_capture].value[it].str, "w"): stdout;
-			if( !out ) die("unable to create file %s:%m", opt[OPT_dump_capture].value[it].str);
+			FILE* out = argfopen(opt[OPT_dump_capture].value[it].str, "w");
 			lips_dump_capture(&m, out);
-			if( out && out != stdout ) fclose(out);
+			argfclose(out);
 		}
 		if( opt[OPT_dump_ast_file].set ){
-			FILE* out = strcmp(opt[OPT_dump_ast_file].value[it].str, "stdout") ? fopen(opt[OPT_dump_ast_file].value[it].str, "w"): stdout;
-			if( !out ) die("unable to create file %s:%m", opt[OPT_dump_ast_file].value[it].str);
+			FILE* out = argfopen(opt[OPT_dump_ast_file].value[it].str, "w");
 			lips_dump_ast(&m, grambyc, out, 1, 0);
-			if( out && out != stdout ) fclose(out);
+			argfclose(out);
 		}
 		if( opt[OPT_dump_ast_dot].set ){
-			FILE* out = strcmp(opt[OPT_dump_ast_dot].value[it].str, "stdout") ? fopen(opt[OPT_dump_ast_dot].value[it].str, "w"): stdout;
-			if( !out ) die("unable to create file %s:%m", opt[OPT_dump_ast_dot].value[it].str);
+			FILE* out = argfopen(opt[OPT_dump_ast_dot].value[it].str, "w");
 			lips_dump_ast(&m, grambyc, out, 0, 1);
-			if( out && out != stdout ) fclose(out);
+			argfclose(out);
+		}
+		if( opt[OPT_E].set ){
+			FILE* out = argfopen(opt[OPT_E].value[it].str, "w");
+			lips_dump_error(&m, source, out);
+			argfclose(out);
 		}
 	}
 	//mfm_s_dtor(&mfm);

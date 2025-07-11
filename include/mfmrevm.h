@@ -94,6 +94,7 @@ int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret);
 lipsAst_s* lips_ast_make(bcnode_s* node);
 void lips_dump_capture(lipsMatch_s* m, FILE* f);
 void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int dot);
+void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f);
 
 #endif
 

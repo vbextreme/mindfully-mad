@@ -1085,7 +1085,50 @@ void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int do
 	if( dot  ) ast_dump_dot(m->ast, nmap, f);
 }
 
+__private int sort_err(const void* a, const void* b){
+	const lipsError_s* ea = a;
+	const lipsError_s* eb = b;
+	if( ea->loc < eb->loc ) return -1;
+	if( ea->loc > eb->loc ) return 1;
+	return 0;
+}
 
+void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
+	if( m->match < 0 ){
+		fprintf(f, "lips error: internal error, this never append for now\n");
+	}
+	else if( m->match > 0 ){
+		fprintf(f, "lips error: no errors, lips have match\n");
+	}
+	else{
+		unsigned const count = m_header(m->err)->len;
+		if( count ){
+			if( !(m->err[count-1].number & LIPS_ERROR_DIE) ){
+				m_qsort(m->err, sort_err);
+			}
+			fprintf(f, "lips error: %u\n", m->err[count-1].number);
+			const char*    sp    = (const char*)m->err[count-1].loc;
+			const unsigned len   = strlen((const char*)source);
+			const unsigned iline = count_line_to((const char*)source, sp);
+			const unsigned offpr = fprintf(f, "%04u | ", iline);
+			const char*    eline = NULL;
+			const char*    sline = extract_line((const char*)source, (const char*)source+len, sp, &eline);
+			unsigned       offv  = offpr;
+			for( const char* p = sline; p < eline; ++p ){
+				fputs(cast_view_char(*p, 0), f);
+				++offv;
+			}
+			fputc('\n', f);
+			for( unsigned i = 0; i < offv-1; ++i ){
+				fputc(' ', f);
+			}
+			fputs("^\n", f);
+		}
+		else{
+			fprintf(f, "lips error: match not have mark any type of error but not have match\n");
+		}
+	}
+}
 
 
 
