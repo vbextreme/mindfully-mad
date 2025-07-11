@@ -262,21 +262,21 @@ regex vm stack based
 */
 
 
-typedef struct revmStack{
+typedef struct lipsStack{
 	unsigned      pc;
 	const utf8_t* sp;
 	int           ls;
 	unsigned      cp;
 	unsigned      np;
-}revmStack_s;
+}lipsStack_s;
 
-typedef struct revm{
+typedef struct lips{
 	uint16_t*      bytecode;
 	uint16_t*      fn;
 	uint16_t*      range;
 	uint16_t*      code;
-	revmStack_s*   stack;
-	const utf8_t*  save[REVM_MAX_CAPTURE*2];
+	lipsStack_s*   stack;
+	const utf8_t*  save[LIPS_MAX_CAPTURE*2];
 	unsigned*      cstk;
 	bcnode_s*      node;
 	const utf8_t*  sp;
@@ -289,9 +289,9 @@ typedef struct revm{
 	uint32_t       sectionURange;
 	uint32_t       sectionName;
 	uint32_t       sectionCode;
-}revm_s;
+}lips_s;
 
-__private revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
+__private lips_s* lips_ctor(lips_s* vm, uint16_t* bytecode, const utf8_t* txt){
 	vm->sectionStart  = bytecode[BYC_START];
 	vm->sectionCode   = bytecode[BYC_SECTION_CODE];
 	vm->sectionRange  = bytecode[BYC_SECTION_RANGE];
@@ -304,7 +304,7 @@ __private revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
 	vm->code     = &bytecode[vm->sectionCode];
 	vm->pc       = 0;
 	vm->sp       = txt;
-	vm->stack    = MANY(revmStack_s, vm->bytecodeLen);
+	vm->stack    = MANY(lipsStack_s, vm->bytecodeLen);
 	vm->cstk     = MANY(unsigned, 128);
 	vm->node     = MANY(bcnode_s, 32);
 	vm->ls       = -1;
@@ -312,7 +312,7 @@ __private revm_s* revm_ctor(revm_s* vm, uint16_t* bytecode, const utf8_t* txt){
 	return vm;
 }
 
-__private void stk_push(revm_s* vm, unsigned pc, const utf8_t* sp){
+__private void stk_push(lips_s* vm, unsigned pc, const utf8_t* sp){
 	unsigned i = m_ipush(&vm->stack);
 	vm->stack[i].pc = pc;
 	vm->stack[i].sp = sp;
@@ -321,7 +321,7 @@ __private void stk_push(revm_s* vm, unsigned pc, const utf8_t* sp){
 	vm->stack[i].np = m_header(vm->node)->len;
 }
 
-__private int stk_pop(revm_s* vm){
+__private int stk_pop(lips_s* vm){
 	long i = m_ipop(vm->stack);
 	if( i < 0 ) return 0;
 	vm->pc = vm->stack[i].pc;
@@ -332,7 +332,7 @@ __private int stk_pop(revm_s* vm){
 	return 1;
 }
 
-__private void stk_return_call_success(revm_s* vm, unsigned pos){
+__private void stk_return_call_success(lips_s* vm, unsigned pos){
 	iassert(pos>0);
 	vm->stack[pos-1].sp = vm->sp;
 	vm->stack[pos-1].ls = vm->ls;
@@ -340,31 +340,31 @@ __private void stk_return_call_success(revm_s* vm, unsigned pos){
 	m_header(vm->stack)->len = pos;
 }
 
-__private void stk_return_call_fail(revm_s* vm, unsigned pos){
+__private void stk_return_call_fail(lips_s* vm, unsigned pos){
 	iassert(pos>0);
 	m_header(vm->stack)->len = pos-1;
 }
 
-__private int range(revm_s* vm, unsigned ir, utf8_t ch){
+__private int range(lips_s* vm, unsigned ir, utf8_t ch){
 	const unsigned im = ch & 0x0F;
 	const unsigned bm = 1 << (ch>>4);
 	return vm->range[ir*16+im] & bm;
 }
 
-__private void save(revm_s* vm, unsigned id){
+__private void save(lips_s* vm, unsigned id){
 	iassert(id < 256);
 	vm->save[id] = vm->sp;
 	if( (int)id > vm->ls ) vm->ls = id;
 }
 
-__private void call(revm_s* vm, unsigned ifn){
+__private void call(lips_s* vm, unsigned ifn){
 	stk_push(vm, vm->pc+1, vm->sp);
 	unsigned i = m_ipush(&vm->cstk);
 	vm->cstk[i] = m_header(vm->stack)->len;
 	stk_push(vm, vm->fn[ifn], vm->sp);
 }
 
-__private void cret(revm_s* vm, int fail){
+__private void cret(lips_s* vm, int fail){
 	long i = m_ipop(vm->cstk);
 	if( i >=0 ){
 		if( fail ){
@@ -376,27 +376,27 @@ __private void cret(revm_s* vm, int fail){
 	}
 }
 
-__private void revm_dtor(revm_s* vm){
+__private void lips_dtor(lips_s* vm){
 	m_free(vm->stack);
 	m_free(vm->cstk);
 	m_free(vm->node);
 }
 
-__private void node(revm_s* vm, nodeOP_e op, unsigned id){
+__private void node(lips_s* vm, nodeOP_e op, unsigned id){
 	unsigned i = m_ipush(&vm->node);
 	vm->node[i].sp = vm->sp;
 	vm->node[i].id = id;
 	vm->node[i].op = op;
 }
 
-__private int vm_exec(revm_s* vm, revmMatch_s* ret){
+__private int vm_exec(lips_s* vm, lipsMatch_s* ret){
 	const unsigned byc = vm->code[vm->pc];
 	switch( BYTECODE_CMD40(byc) ){
 		case OP_MATCH:
 			save(vm, 1);
 			memcpy(ret->capture, vm->save, sizeof(const utf8_t*) * (vm->ls+1));
 			ret->match = (vm->ls+1)/2;
-			if( m_header(vm->node)->len ) ret->ast = reast_make(vm->node);
+			if( m_header(vm->node)->len ) ret->ast = lips_ast_make(vm->node);
 		return 0;
 		
 		case OP_CHAR:
@@ -473,17 +473,17 @@ __private int vm_exec(revm_s* vm, revmMatch_s* ret){
 	return -1;
 }
 
-revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt){
-	revmMatch_s ret = {.match = 0, .ast = NULL};
-	revm_s vm;
-	revm_ctor(&vm, bytecode, txt);
+lipsMatch_s lips_match(uint16_t* bytecode, const utf8_t* txt){
+	lipsMatch_s ret = {.match = 0, .ast = NULL};
+	lips_s vm;
+	lips_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
 	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
-	revm_dtor(&vm);
+	lips_dtor(&vm);
 	return ret;
 }
 
-const char** revm_map_name(const uint16_t* bytecode){
+const char** lips_map_name(const uint16_t* bytecode){
 	unsigned const count = bytecode[BYC_FN_COUNT];
 	const uint16_t* n = &bytecode[bytecode[BYC_SECTION_NAME]];
 	const char** ret = MANY(const char*, count);
@@ -683,7 +683,7 @@ __private void draw_header(unsigned start, unsigned ranges, unsigned functions, 
 	printf("start:%04X ranges:%u functions:%u stacksize:%u", start, ranges, functions, stacksize);
 }
 
-__private void draw_stack(revmStack_s* base, const utf8_t* txt){
+__private void draw_stack(lipsStack_s* base, const utf8_t* txt){
 	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
 	unsigned ny = DBG_STACKED_H;
 	unsigned count = m_header(base)->len;
@@ -700,7 +700,7 @@ __private void draw_stack(revmStack_s* base, const utf8_t* txt){
 	}
 }
 
-__private void draw_cstack(revm_s* vm){
+__private void draw_cstack(lips_s* vm){
 	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
 	unsigned ny = DBG_STACKED_H;
 	unsigned count = m_header(vm->cstk)->len;
@@ -714,7 +714,7 @@ __private void draw_cstack(revm_s* vm){
 	}
 }
 
-__private void draw_node(revm_s* vm, const char** nmap, const utf8_t* txt){
+__private void draw_node(lips_s* vm, const char** nmap, const utf8_t* txt){
 	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
 	unsigned ny = DBG_STACKED_H;
 	unsigned count = m_header(vm->node)->len;
@@ -726,14 +726,14 @@ __private void draw_node(revm_s* vm, const char** nmap, const utf8_t* txt){
 		switch( vm->node[sc].op ){
 			case NOP_NEW    : printf(" + [%4u](%3d)%s %lu", sc, vm->node[sc].id, nmap[vm->node[sc].id], vm->node[sc].sp - txt); break;
 			case NOP_PARENT : printf(" < [%4d] %lu", sc, vm->node[sc].sp - txt); break;
-			case NOP_DISABLE: printf(" ~ [%4u]", sc);
-			case NOP_ENABLE : printf(" & [%4u]", sc);
+			case NOP_DISABLE: printf(" ~ [%4u]", sc); break;
+			case NOP_ENABLE : printf(" & [%4u]", sc); break;
 		}
 		++sc;
 	}
 }
 
-__private void draw_save(revm_s* vm, const utf8_t* txt){
+__private void draw_save(lips_s* vm, const utf8_t* txt){
 	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
 	unsigned ny = DBG_STACKED_H;
 	unsigned count = vm->ls+1;
@@ -751,7 +751,7 @@ __private void draw_range_clr(void){
 	draw_cls_rect(1, DBG_HEADER_H+2+DBG_STACKED_H+1, DBG_SCREEN_W, DBG_RANGE_H);
 }
 
-__private void draw_range(revm_s* vm, unsigned idrange, long ch){
+__private void draw_range(lips_s* vm, unsigned idrange, long ch){
 	const unsigned cunset = 130;
 	const unsigned cerr   = 124;
 	const unsigned cset   = 22;
@@ -783,7 +783,7 @@ __private void draw_range(revm_s* vm, unsigned idrange, long ch){
 	term_reset();
 }
 
-__private void draw_input(revm_s* vm, const utf8_t* txt, unsigned len, int oncol){
+__private void draw_input(lips_s* vm, const utf8_t* txt, unsigned len, int oncol){
 	unsigned y = DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1;
 	draw_cls_rect(1, y, DBG_SCREEN_W, DBG_INP_H);
 	unsigned const ls = m_header(vm->stack)->len-1;
@@ -823,7 +823,7 @@ __private void draw_input(revm_s* vm, const utf8_t* txt, unsigned len, int oncol
 	term_reset();
 }
 
-__private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap, unsigned curpc, const utf8_t* txt, unsigned len){
+__private void draw_opcode(lips_s* vm, unsigned pc, const char** nmap, unsigned curpc, const utf8_t* txt, unsigned len){
 	unsigned byc = vm->code[pc];
 	switch( BYTECODE_CMD40(byc) ){
 		default : printf("INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
@@ -869,7 +869,7 @@ __private void draw_opcode(revm_s* vm, unsigned pc, const char** nmap, unsigned 
 	}
 }
 
-__private void draw_code(revm_s* vm, unsigned pc, const char** nmap, const utf8_t* txt, unsigned len){
+__private void draw_code(lips_s* vm, unsigned pc, const char** nmap, const utf8_t* txt, unsigned len){
 	unsigned y = DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1;
 	unsigned const count = vm->bytecode[BYC_CODELEN];
 	unsigned const csel  = 63;
@@ -910,7 +910,7 @@ __private void onend(void){
 	fflush(stdout);
 }
 
-__private void redraw(revm_s* vm, const utf8_t* txt, unsigned len, const char** nmap){
+__private void redraw(lips_s* vm, const utf8_t* txt, unsigned len, const char** nmap){
 	draw_range_clr();
 	draw_header(vm->sectionStart, vm->bytecode[BYC_RANGE_COUNT], vm->bytecode[BYC_FN_COUNT], m_header(vm->stack)->len);
 	draw_stack(vm->stack, txt);
@@ -925,24 +925,60 @@ __private void redraw(revm_s* vm, const utf8_t* txt, unsigned len, const char** 
 	fflush(stdout);
 }
 
-__private void ast_dump_stdout(reAst_s* ast, const char** nmap, unsigned tab){
+__private void ast_dump_stdout(lipsAst_s* ast, const char** nmap, unsigned tab){
 	for( unsigned i = 0; i < tab; ++i ){
 		putchar(' ');
 		putchar(' ');
 	}
 	if( m_header(ast->child)->len ){
-		printf("<%s>\n", ast->id == REVM_NODE_START ? "_start_": nmap[ast->id]);
+		printf("<%s>\n", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		mforeach(ast->child,i){
 			ast_dump_stdout(&ast->child[i], nmap, tab+1);
 		}
 	}
 	else{
-		printf("<%s> '", ast->id == REVM_NODE_START ? "_start_": nmap[ast->id]);
+		printf("<%s> '", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		for( unsigned i = 0; i < ast->len; ++i ){
 			putc_view_char(ast->sp[i]);
 		}
 		printf("'\n");
 	}
+}
+
+__private void dump_dot(lipsAst_s* ast, const char** nmap, FILE* f, const char* parent, unsigned index){
+	__free char* name = str_printf("%s_%s_%d", parent, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id], index);
+	if( *parent ) fprintf(f, "%s -> %s;\n",parent, name);
+
+	if( m_header(ast->child)->len ){
+		fprintf(f, "%s [label=\"%s\"];\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		mforeach(ast->child,i){
+			dump_dot(&ast->child[i], nmap, f, name, i);
+		}
+	}
+	else{
+		fprintf(f, "%s [label=\"%s\\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		for( unsigned i = 0; i < ast->len; ++i ){
+			if( ast->sp[i] == '\n' ){
+				fputs("\\n", f);
+			}
+			else if( ast->sp[i] == '\t' ){
+				fputs("\\t", f);
+			}
+			else{
+				fputc(ast->sp[i], f);
+			}
+		}
+		fprintf(f, "\"];\n");
+	}
+}
+
+__private void ast_dump_dot(lipsAst_s* ast, const char** nmap){
+	FILE* f = fopen("ast.dot", "w");
+	if( !f ) die("unable to create file: %m");
+	fputs("digraph {\n", f);
+	dump_dot(ast, nmap, f, "", 0);
+	fputs("}\n", f);
+	fclose(f);
 }
 
 typedef enum { DBGMODE_STEP, DBGMODE_CONTINUE } dbgmode_e;
@@ -953,12 +989,12 @@ __private long find_bp(uint32_t* bp, uint32_t val){
 	return -1;
 }
 
-void revm_debug(uint16_t* bytecode, const utf8_t* txt){
-	revmMatch_s ret = {.match = 0, .ast = NULL};
-	revm_s vm;
-	revm_ctor(&vm, bytecode, txt);
+void lips_debug(uint16_t* bytecode, const utf8_t* txt){
+	lipsMatch_s ret = {.match = 0, .ast = NULL};
+	lips_s vm;
+	lips_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
-	__free const char** nmap = revm_map_name(bytecode);
+	__free const char** nmap = lips_map_name(bytecode);
 	__free uint32_t* bp = MANY(uint32_t, 4);
 
 	unsigned len = strlen((char*)txt);
@@ -1023,9 +1059,12 @@ void revm_debug(uint16_t* bytecode, const utf8_t* txt){
 			unsigned len = ret.capture[en] - ret.capture[st];
 			printf("capture[0]: '%.*s'\n", len, ret.capture[st]);
 		}
-		if( ret.ast ) ast_dump_stdout(ret.ast, nmap, 0);
+		if( ret.ast ){
+			ast_dump_stdout(ret.ast, nmap, 0);
+			ast_dump_dot(ret.ast, nmap);
+		}
 	}
-	revm_dtor(&vm);
+	lips_dtor(&vm);
 }
 
 

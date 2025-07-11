@@ -19,11 +19,11 @@ typedef enum{
 }options_e;
 
 option_s opt[] = {
-	{ 'g', "--grammar"   , "grammar file"             ,              OPT_PATH | OPT_EXISTS, 0, NULL},
-	{'\0', "--reasm-gram", "use builtin reasm grammar",                          OPT_NOARG, 0, NULL},
-	{ 's', "--source"    , "source file"              ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ 'd', "--debug"     , "debug"                    ,                          OPT_NOARG, 0, NULL},
-	{ 'h', "--help"      , "display this"             ,                OPT_NOARG | OPT_END, 0, NULL},
+	{ 'g', "--grammar"     , "grammar file"                ,              OPT_PATH | OPT_EXISTS, 0, NULL},
+	{'\0', "--lipsasm-gram", "use builtin lips asm grammar",                          OPT_NOARG, 0, NULL},
+	{ 's', "--source"      , "source file"                 ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
+	{ 'd', "--debug"       , "debug"                       ,                          OPT_NOARG, 0, NULL},
+	{ 'h', "--help"        , "display this"                ,                OPT_NOARG | OPT_END, 0, NULL},
 };
 
 int main(int argc, char** argv){
@@ -58,7 +58,7 @@ int main(int argc, char** argv){
 	//	if( opt[OPT_dump_token].set ) mfm_token_dump(&mfm);
 		if( opt[OPT_d].set ){
 			__free utf8_t* source = (utf8_t*)load_file(opt[OPT_s].value[it].str);
-			revm_debug(grambyc, source);
+			lips_debug(grambyc, source);
 		}
 	}
 	//mfm_s_dtor(&mfm);

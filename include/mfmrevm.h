@@ -28,8 +28,8 @@
 #define BYTECODE_FLAG_BEGIN     0x01
 #define BYTECODE_FLAG_MULTILINE 0x02
 
-#define REVM_MAX_CAPTURE 128
-#define REVM_NODE_START  UINT16_MAX
+#define LIPS_MAX_CAPTURE 128
+#define LIPS_NODE_START  UINT16_MAX
 
 typedef enum{
 	OP_MATCH  = 0x0000,
@@ -63,25 +63,27 @@ typedef struct bcnode{
 	const utf8_t* sp;
 }bcnode_s;
 
-typedef struct reAst{
-	struct reAst* parent;
-	struct reAst* child;
-	const utf8_t* sp;
-	unsigned      len;
-	uint16_t      id;
-}reAst_s;
+typedef struct lipsAst{
+	struct lipsAst* parent;
+	struct lipsAst* child;
+	const utf8_t*   sp;
+	unsigned        len;
+	uint16_t        id;
+}lipsAst_s;
 
-typedef struct revmMatch{
-	reAst_s*      ast;
-	const utf8_t* capture[REVM_MAX_CAPTURE * 2];
+
+
+typedef struct lipsMatch{
+	lipsAst_s*    ast;
+	const utf8_t* capture[LIPS_MAX_CAPTURE * 2];
 	int           match;
-}revmMatch_s;
+}lipsMatch_s;
 
-revmMatch_s revm_match(uint16_t* bytecode, const utf8_t* txt);
-const char** revm_map_name(const uint16_t* bytecode);
-void revm_debug(uint16_t* bytecode, const utf8_t* txt);
+lipsMatch_s lips_match(uint16_t* bytecode, const utf8_t* txt);
+const char** lips_map_name(const uint16_t* bytecode);
+void lips_debug(uint16_t* bytecode, const utf8_t* txt);
 
-reAst_s* reast_make(bcnode_s* node);
+lipsAst_s* lips_ast_make(bcnode_s* node);
 
 #endif
 

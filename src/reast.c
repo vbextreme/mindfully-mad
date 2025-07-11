@@ -1,15 +1,14 @@
 #include <mfmrevm.h>
 
-__private reAst_s* recast(bcnode_s* node){
+__private lipsAst_s* recast(bcnode_s* node){
 	unsigned j;
-	reAst_s* start = NEW(reAst_s);
+	lipsAst_s* start = NEW(lipsAst_s);
 	start->sp = 0;
-	start->id = REVM_NODE_START;
+	start->id = LIPS_NODE_START;
 	start->parent = NULL;
-	start->child = MANY(reAst_s, 2);
-	reAst_s* current = start;
-	dbg_info("created _start_");
-	unsigned disable = 1;
+	start->child = MANY(lipsAst_s, 2);
+	lipsAst_s* current = start;
+	unsigned disable = 0;
 
 	mforeach(node, i){
 		if( !current ) die("internall error, list node corrupted");
@@ -20,7 +19,7 @@ __private reAst_s* recast(bcnode_s* node){
 				current->child[j].id = node[i].id;
 				current->child[j].sp = node[i].sp;
 				current->child[j].parent = current;
-				current->child[j].child  = MANY(reAst_s, 2);
+				current->child[j].child  = MANY(lipsAst_s, 2);
 				current = &current->child[j];
 			break;
 			case NOP_PARENT:
@@ -41,8 +40,6 @@ __private reAst_s* recast(bcnode_s* node){
 	return start;
 }
 
-
-
-reAst_s* reast_make(bcnode_s* node){
+lipsAst_s* lips_ast_make(bcnode_s* node){
 	return recast(node);
 }
