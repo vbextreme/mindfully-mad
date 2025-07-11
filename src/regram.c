@@ -5,7 +5,9 @@
 
 /*
 GRAMMAR: lipsasm;
-ERRRORS[1]: 'missing valid function name terminated with :'
+ERRRORS[1]: 'apsected + or -'
+ERRORSS[2]: 'aspected colon after label or function'
+ERRORSS[3]: 'invalid label name'
 
 num   : '[0-9]+';
 word  : '[a-zA-Z_]+[a-zA-Z0-9]*';
@@ -32,9 +34,8 @@ char  : '\'' escape '\''
 
 emptyline-: sep? endl;
 comment-  : comma any;
-label     : word sep? colon;
-fnname    : word sep? colon;
-decfn     : fn (plus|minus) (fnname|$[1]);
+label     : (word|$[3]) sep? (colon|$[2]);
+decfn     : fn (plus|minus|$[1]) fnname);
 endcmd    : sep? comment
           | sep? endl
           ;
@@ -68,7 +69,9 @@ program: progline+;
 _start_: program;
 */
 
-#define LIPSASM_ERROR_INVALID_FUNCTION_NAME 0x01
+#define LIPSASM_ERROR_ASPECTED_STORE_FN     0x01
+#define LIPSASM_ERROR_ASPECTED_COLON        0x02
+#define LIPSASM_ERROR_INVALID_LABEL_NAME 0x03
 
 __private void token_class(recom_s* rc, const char* fnname, const char* accept, unsigned rev, unsigned store){
 	INIT(rc);
@@ -252,46 +255,36 @@ __private void def_comment(recom_s* rc){
 	RET(0);
 }
 
-//label     : word sep? colon;
+//label     : (word|$[3]) sep? (colon|$[2]);
 __private void def_label(recom_s* rc){
 	INIT(rc);
 	FN("label", 1);
-	USELBL(1);
-	CALL("word");
-	SPLIT(L[0]);
-	CALL("sep");
-	LABEL(L[0]); CALL("colon");
-	RET(1);
-}
-
-
-//fnname    : word sep? colon;
-__private void def_fnname(recom_s* rc){
-	INIT(rc);
-	FN("fnname", 1);
-	USELBL(1);
+	USELBL(3);
+					SPLIT(L[1]);
 					CALL("word");
 					SPLIT(L[0]);
 					CALL("sep");
-	LABEL(L[0]);	CALL("colon");
-	RET(1);
+	LABEL(L[0]);	SPLIT(L[2]);
+					CALL("colon");
+					RET(1);
+	LABEL(L[1]);	ERROR(1, LIPSASM_ERROR_INVALID_LABEL_NAME);
+	LABEL(L[2]);	ERROR(1, LIPSASM_ERROR_ASPECTED_COLON);
 }
 
-//decfn     : fn (plus|minus) (fnname|$[1]);
+//decfn     : fn (plus|minus|$[1]) fnname);
 __private void def_decfn(recom_s* rc){
 	INIT(rc);
 	FN("decfn", 1);
-	USELBL(4);
+	USELBL(3);
 					CALL("fn");
 					SPLIT(L[1]);
 					CALL("plus");
 					JMP(L[0]);
-	LABEL(L[1]);	CALL("minus");
-	LABEL(L[0]);	SPLIT(L[3]);
-					CALL("fnname");
-					JMP(L[2]);
-	LABEL(L[3]);	ERROR(1, LIPSASM_ERROR_INVALID_FUNCTION_NAME);
-	LABEL(L[2]);	RET(1);
+	LABEL(L[1]);	SPLIT(L[2]);
+					CALL("minus");
+	LABEL(L[0]);	CALL("label");
+					RET(1);
+	LABEL(L[2]);	ERROR(1, LIPSASM_ERROR_ASPECTED_STORE_FN);
 }
 
 //endcmd    : sep? comment
@@ -506,7 +499,6 @@ uint16_t* reasmgram_make(void){
 	def_emptyline(ROBJ());
 	def_comment(ROBJ());
 	def_label(ROBJ());
-	def_fnname(ROBJ());
 	def_decfn(ROBJ());
 	def_endcmd(ROBJ());
 	def_chrange(ROBJ());

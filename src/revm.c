@@ -642,6 +642,7 @@ typedef struct lipsdbg{
 	dbgcommand_e  run;
 	unsigned      srclen;
 	uint32_t      curstk;
+	long          next[2];
 }lipsdbg_s;
 
 typedef void (*dbgaction_f)(lipsdbg_s*, char** args);
@@ -1014,6 +1015,16 @@ __private void action_step(lipsdbg_s* l, __unused char** args){
 	l->run = DCMD_STEP;
 }
 
+__private void action_next(lipsdbg_s* l, __unused char** args){
+	if( !l->curstk ){
+		l->next[0] = l->next[1] = -1;
+		return;
+	}
+	l->next[0] = l->vm.stack[l->curstk-1].pc + 1;
+	l->next[1] = l->curstk > 1 ? l->vm.stack[l->curstk-2].pc: -1;
+	l->run = DCMD_CONTINUE;
+}
+
 __private void action_continue(lipsdbg_s* l, __unused char** args){
 	l->run = DCMD_CONTINUE;
 }
@@ -1054,6 +1065,11 @@ cmdmap_s CMD[] = {{
 		.act = action_step,
 		.nam = 0
 	},{
+		.shr = "n",
+		.lng = "next",
+		.act = action_next,
+		.nam = 0
+	},{
 		.shr = "c",
 		.lng = "continue",
 		.act = action_continue,
@@ -1083,11 +1099,18 @@ long debug_command_arg_address(const char* from, unsigned byclen){
 }
 
 __private void debug_command(lipsdbg_s* l){
-	if( l->curstk && find_bp(l->breakpoint, l->vm.stack[l->curstk].pc) >= 0 ){
-		l->run = DCMD_STEP;
+	if( l->curstk && find_bp(l->breakpoint, l->vm.stack[l->curstk-1].pc) >= 0 ){
+		l->run = DCMD_SUSPEND;
 	}
 	else if( l->run == DCMD_CONTINUE ){
-		return;
+		if( l->curstk ){
+			if( l->next[0] > -1 && l->next[0] == l->vm.stack[l->curstk-1].pc ) l->run = DCMD_SUSPEND;
+			else if( l->next[1] > -1 && l->next[1] == l->vm.stack[l->curstk-1].pc ) l->run = DCMD_SUSPEND;
+			else return;
+		}
+		else{
+			return;
+		}
 	}
 	
 	do{
@@ -1101,6 +1124,7 @@ __private void debug_command(lipsdbg_s* l){
 		for( unsigned i = 0; i < sizeof_vector(CMD); ++i ){
 			if( !strcmp(args[0], CMD[i].shr) || !strcmp(args[0], CMD[i].lng) ){
 				if( CMD[i].nam == m_header(args)->len-1 ) CMD[i].act(l, args);
+				CMD[0].act = CMD[i].act;
 				break;
 			}
 		}
@@ -1184,20 +1208,22 @@ void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
 			if( !(m->err[count-1].number & LIPS_ERROR_DIE) ){
 				m_qsort(m->err, sort_err);
 			}
-			fprintf(f, "lips error: %u\n", m->err[count-1].number);
+			unsigned num  = m->err[count-1].number;
+			unsigned fail = num & LIPS_ERROR_DIE;
+			num &= ~LIPS_ERROR_DIE;
+			fprintf(f, "lips %s: %u\n", fail?"fail":"error", num);
 			const char*    sp    = (const char*)m->err[count-1].loc;
 			const unsigned len   = strlen((const char*)source);
 			const unsigned iline = count_line_to((const char*)source, sp);
-			const unsigned offpr = fprintf(f, "%04u | ", iline);
+			unsigned       offv  = fprintf(f, "%04u | ", iline);
 			const char*    eline = NULL;
 			const char*    sline = extract_line((const char*)source, (const char*)source+len, sp, &eline);
-			unsigned       offv  = offpr;
 			for( const char* p = sline; p < eline; ++p ){
 				fputs(cast_view_char(*p, 0), f);
-				++offv;
+				if( p < sp ) ++offv;
 			}
 			fputc('\n', f);
-			for( unsigned i = 0; i < offv-1; ++i ){
+			for( unsigned i = 0; i < offv; ++i ){
 				fputc(' ', f);
 			}
 			fputs("^\n", f);
