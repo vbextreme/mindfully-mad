@@ -4,7 +4,8 @@
 #include <notstd/str.h>
 
 /*
-GRAMMAR: reasm;
+GRAMMAR: lipsasm;
+ERRRORS[1]: 'missing valid function name terminated with :'
 
 num   : '[0-9]+';
 word  : '[a-zA-Z_]+[a-zA-Z0-9]*';
@@ -13,6 +14,8 @@ sep-  : '[ \t]+';
 comma-: ';';
 colon-: ':';
 dot-  : '.';
+plus  : '+';
+minus : '-';
 any-  : '[^\n]*';
 fn    : 'fn';
 dec   : 'dec';
@@ -30,7 +33,8 @@ char  : '\'' escape '\''
 emptyline-: sep? endl;
 comment-  : comma any;
 label     : word sep? colon;
-decfn     : fn dot word sep? colon;
+fnname    : word sep? colon;
+decfn     : fn (plus|minus) (fnname|$[1]);
 endcmd    : sep? comment
           | sep? endl
           ;
@@ -63,6 +67,8 @@ progline-: emptyline
 program: progline+;
 _start_: program;
 */
+
+#define LIPSASM_ERROR_INVALID_FUNCTION_NAME 0x01
 
 __private void token_class(recom_s* rc, const char* fnname, const char* accept, unsigned rev, unsigned store){
 	INIT(rc);
@@ -136,6 +142,17 @@ __private void def_dot(recom_s* rc){
 	token_char(rc, "dot", ".", 0);
 }
 
+//plus  : '+';
+__private void def_plus(recom_s* rc){
+	token_char(rc, "plus", "+", 1);
+}
+
+//minus  : '-';
+__private void def_minus(recom_s* rc){
+	token_char(rc, "minus", "-", 1);
+}
+
+
 //any-  : '[^\n]*';
 __private void def_any(recom_s* rc){
 	token_class(rc, "any", "\n", 1, 0);
@@ -189,14 +206,14 @@ __private void def_ch(recom_s* rc){
 	INIT(rc);
 	FN("ch", 1);
 	USELBL(3);
-	SPLIT(L[1]);
-	CALL("escape");
-	JMP(L[0]);
-	LABEL(L[1]); SPLIT(L[2]);
-	CALL("num");
-	JMP(L[0]);
-	LABEL(L[2]); CALL("nescape");
-	LABEL(L[0]); RET(1);
+					SPLIT(L[1]);
+					CALL("escape");
+					JMP(L[0]);
+	LABEL(L[1]);	SPLIT(L[2]);
+					CALL("num");
+					JMP(L[0]);
+	LABEL(L[2]);	CALL("nescape");
+	LABEL(L[0]);	RET(1);
 }
 
 //char  : '\'' nescape '\''
@@ -206,12 +223,12 @@ __private void def_char(recom_s* rc){
 	INIT(rc);
 	FN("char", 1);
 	USELBL(2);
-	CHAR('\'');
-	SPLIT(L[1]);
-	CALL("escape");
-	JMP(L[0]);
-	LABEL(L[1]); CALL("nescape");
-	LABEL(L[0]); CHAR('\'');
+					CHAR('\'');
+					SPLIT(L[1]);
+					CALL("escape");
+					JMP(L[0]);
+	LABEL(L[1]);	CALL("nescape");
+	LABEL(L[0]);	CHAR('\'');
 	RET(1);
 }
 
@@ -220,9 +237,9 @@ __private void def_emptyline(recom_s* rc){
 	INIT(rc);
 	FN("emptyline", 0);
 	USELBL(1);
-	SPLIT(L[0]);
-	CALL("sep");
-	LABEL(L[0]); CALL("endl");
+					SPLIT(L[0]);
+					CALL("sep");
+	LABEL(L[0]);	CALL("endl");
 	RET(0);
 }
 
@@ -247,18 +264,34 @@ __private void def_label(recom_s* rc){
 	RET(1);
 }
 
-//decfn     : fn dot word sep? colon;
+
+//fnname    : word sep? colon;
+__private void def_fnname(recom_s* rc){
+	INIT(rc);
+	FN("fnname", 1);
+	USELBL(1);
+					CALL("word");
+					SPLIT(L[0]);
+					CALL("sep");
+	LABEL(L[0]);	CALL("colon");
+	RET(1);
+}
+
+//decfn     : fn (plus|minus) (fnname|$[1]);
 __private void def_decfn(recom_s* rc){
 	INIT(rc);
 	FN("decfn", 1);
-	USELBL(1);
-	CALL("fn");
-	CALL("dot");
-	CALL("word");
-	SPLIT(L[0]);
-	CALL("sep");
-	LABEL(L[0]); CALL("colon");
-	RET(1);
+	USELBL(5);
+					CALL("fn");
+					SPLIT(L[1]);
+					CALL("plus");
+					JMP(L[0]);
+	LABEL(L[1]);	CALL("minus");
+	LABEL(L[0]);	SPLIT(L[3]);
+					CALL("fnname");
+					JMP(L[2]);
+	LABEL(L[3]);	ERROR(1, LIPSASM_ERROR_INVALID_FUNCTION_NAME);
+					RET(1);
 }
 
 //endcmd    : sep? comment
@@ -268,13 +301,13 @@ __private void def_endcmd(recom_s* rc){
 	INIT(rc);
 	FN("endcmd", 1);
 	USELBL(3);
-	SPLIT(L[0]);
-	CALL("sep");
-	LABEL(L[0]); SPLIT(L[1]);
-	CALL("comment");
-	JMP(L[2]);
-	LABEL(L[1]); CALL("endl");
-	LABEL(L[2]); RET(1);
+					SPLIT(L[0]);
+					CALL("sep");
+	LABEL(L[0]);	SPLIT(L[1]);
+					CALL("comment");
+					JMP(L[2]);
+	LABEL(L[1]);	CALL("endl");
+	LABEL(L[2]);	RET(1);
 }
 
 //chrange   : ch ('-' ch)?;
@@ -282,11 +315,11 @@ __private void def_chrange(recom_s* rc){
 	INIT(rc);
 	FN("chrange", 1);
 	USELBL(1);
-	CALL("ch");
-	SPLIT(L[0]);
-	CHAR('-');
-	CALL("ch");
-	LABEL(L[0]); RET(1);
+					CALL("ch");
+					SPLIT(L[0]);
+					CHAR('-');
+					CALL("ch");
+	LABEL(L[0]);	RET(1);
 }
 
 //chclass   : '\'' chrange+ '\'';
@@ -294,11 +327,11 @@ __private void def_chclass(recom_s* rc){
 	INIT(rc);
 	FN("chclass", 1);
 	USELBL(1);
-	CHAR('\'');
-	LABEL(L[0]); CALL("chrange");
-	SPLIR(L[0]);
-	CHAR('\'');
-	RET(1);
+					CHAR('\'');
+	LABEL(L[0]);	CALL("chrange");
+					SPLIR(L[0]);
+					CHAR('\'');
+					RET(1);
 }
 
 //decrange  : dec dot range '[' num ']' sep? colon sep? chclass endcmd
@@ -306,20 +339,20 @@ __private void def_decrange(recom_s* rc){
 	INIT(rc);
 	FN("decrange", 1);
 	USELBL(2);
-	CALL("dec");
-	CALL("dot");
-	CALL("range");
-	CHAR('[');
-	CALL("num");
-	CHAR(']');
-	SPLIT(L[0]);
-	CALL("sep");
-	LABEL(L[0]); CALL("colon");
-	SPLIT(L[1]);
-	CALL("sep");
-	LABEL(L[1]); CALL("chclass");
-	CALL("endcmd");
-	RET(1);
+					CALL("dec");
+					CALL("dot");
+					CALL("range");
+					CHAR('[');
+					CALL("num");
+					CHAR(']');
+					SPLIT(L[0]);
+					CALL("sep");
+	LABEL(L[0]);	CALL("colon");
+					SPLIT(L[1]);
+					CALL("sep");
+	LABEL(L[1]);	CALL("chclass");
+					CALL("endcmd");
+					RET(1);
 }
 
 //arg   : char
@@ -330,34 +363,34 @@ __private void def_arg(recom_s* rc){
 	INIT(rc);
 	FN("arg", 1);
 	USELBL(3);
-	SPLIT(L[1]);
-	CALL("char");
-	JMP(L[0]);
-	LABEL(L[1]); SPLIT(L[2]);
-	CALL("num");
-	JMP(L[0]);
-	LABEL(L[2]); CALL("word");
-	LABEL(L[0]); RET(1);
+					SPLIT(L[1]);
+					CALL("char");
+					JMP(L[0]);
+	LABEL(L[1]);	SPLIT(L[2]);
+					CALL("num");
+					JMP(L[0]);
+	LABEL(L[2]);	CALL("word");
+	LABEL(L[0]);	RET(1);
 }
 
 //cmdsym: word endcmd;
 __private void def_cmdsym(recom_s* rc){
 	INIT(rc);
 	FN("cmdsym", 1);
-	CALL("word");
-	CALL("endcmd");
-	RET(1);
+					CALL("word");
+					CALL("endcmd");
+					RET(1);
 }
 
 //cmdarg: word sep arg endcmd;
 __private void def_cmdarg(recom_s* rc){
 	INIT(rc);
 	FN("cmdarg", 1);
-	CALL("word");
-	CALL("sep");
-	CALL("arg");
-	CALL("endcmd");
-	RET(1);
+					CALL("word");
+					CALL("sep");
+					CALL("arg");
+					CALL("endcmd");
+					RET(1);
 }
 
 //cmd   : sep? cmdsym
@@ -367,31 +400,31 @@ __private void def_cmd(recom_s* rc){
 	INIT(rc);
 	FN("cmd", 1);
 	USELBL(3);
-	SPLIT(L[2]);
-	CALL("sep");
-	LABEL(L[2]); SPLIT(L[1]);
-	CALL("cmdsym");
-	JMP(L[0]);
-	LABEL(L[1]); CALL("cmdarg");
-	LABEL(L[0]); RET(1);
+					SPLIT(L[2]);
+					CALL("sep");
+	LABEL(L[2]);	SPLIT(L[1]);
+					CALL("cmdsym");
+					JMP(L[0]);
+	LABEL(L[1]);	CALL("cmdarg");
+	LABEL(L[0]);	RET(1);
 }
 
 //cmdlbl: label cmd;
 __private void def_cmdlbl(recom_s* rc){
 	INIT(rc);
 	FN("cmdlbl", 1);
-	CALL("label");
-	CALL("cmd");
-	RET(1);
+					CALL("label");
+					CALL("cmd");
+					RET(1);
 }
 
 //cmdfn : decfn cmd;
 __private void def_cmdfn(recom_s* rc){
 	INIT(rc);
 	FN("cmdfn", 1);
-	CALL("decfn");
-	CALL("cmd");
-	RET(1);
+					CALL("decfn");
+					CALL("cmd");
+					RET(1);
 }
 
 //command: sep? cmdfn
@@ -399,24 +432,23 @@ __private void def_cmdfn(recom_s* rc){
 //       | cmd
 //       | sep? decrange
 //       ;
-
 __private void def_command(recom_s* rc){
 	INIT(rc);
 	FN("command", 1);
 	USELBL(5);
-	SPLIT(L[0]);
-	CALL("sep");
-	LABEL(L[0]); SPLIT(L[2]);
-	CALL("cmdfn");
-	JMP(L[1]);
-	LABEL(L[2]); SPLIT(L[3]);
-	CALL("cmdlbl");
-	JMP(L[1]);
-	LABEL(L[3]); SPLIT(L[4]);
-	CALL("cmd");
-	JMP(L[1]);
-	LABEL(L[4]); CALL("decrange");
-	LABEL(L[1]); RET(1);
+					SPLIT(L[0]);
+					CALL("sep");
+	LABEL(L[0]);	SPLIT(L[2]);
+					CALL("cmdfn");
+					JMP(L[1]);
+	LABEL(L[2]);	SPLIT(L[3]);
+					CALL("cmdlbl");
+					JMP(L[1]);
+	LABEL(L[3]);	SPLIT(L[4]);
+					CALL("cmd");
+					JMP(L[1]);
+	LABEL(L[4]);	CALL("decrange");
+	LABEL(L[1]);	RET(1);
 }
 
 //progline-: emptyline
@@ -428,15 +460,15 @@ __private void def_progline(recom_s* rc){
 	FN("progline", 0);
 	USELBL(4);
 	SPLIT(L[1]);
-	CALL("emptyline");
-	JMP(L[0]);
-	LABEL(L[1]); SPLIT(L[2]);
-	SPLIT(L[3]);
-	CALL("sep");
-	LABEL(L[3]); CALL("comment");
-	JMP(L[0]);
-	LABEL(L[2]); CALL("command");
-	LABEL(L[0]); RET(0);
+					CALL("emptyline");
+					JMP(L[0]);
+	LABEL(L[1]);	SPLIT(L[2]);
+					SPLIT(L[3]);
+					CALL("sep");
+	LABEL(L[3]);	CALL("comment");
+					JMP(L[0]);
+	LABEL(L[2]);	CALL("command");
+	LABEL(L[0]);	RET(0);
 }
 
 //program: progline+;
@@ -444,9 +476,9 @@ __private void def_program(recom_s* rc){
 	INIT(rc);
 	FN("program", 1);
 	USELBL(1);
-	LABEL(L[0]); CALL("progline");
-	SPLIR(L[0]);
-	RET(1);
+	LABEL(L[0]);	CALL("progline");
+					SPLIR(L[0]);
+					RET(1);
 }
 
 //_start_: program;
@@ -461,6 +493,8 @@ uint16_t* reasmgram_make(void){
 	def_comma(ROBJ());
 	def_colon(ROBJ());
 	def_dot(ROBJ());
+	def_plus(ROBJ());
+	def_minus(ROBJ());
 	def_any(ROBJ());
 	def_fn(ROBJ());
 	def_dec(ROBJ());
@@ -472,6 +506,7 @@ uint16_t* reasmgram_make(void){
 	def_emptyline(ROBJ());
 	def_comment(ROBJ());
 	def_label(ROBJ());
+	def_fnname(ROBJ());
 	def_decfn(ROBJ());
 	def_endcmd(ROBJ());
 	def_chrange(ROBJ());

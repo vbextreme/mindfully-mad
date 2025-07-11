@@ -59,6 +59,7 @@ recom_s* recom_calli(recom_s* rc, unsigned ifn);
 recom_s* recom_call(recom_s* rc, const char* name, unsigned len);
 recom_s* recom_ret(recom_s* rc, int fn);
 recom_s* recom_nodeex(recom_s* rc, nodeOP_e op);
+recom_s* recom_error(recom_s* rc, uint8_t die, uint8_t num);
 recom_s* recom_start(recom_s* rc, int search);
 uint16_t* recom_make(recom_s* rc);
 
@@ -92,6 +93,7 @@ uint16_t* recom_make(recom_s* rc);
 #define PARENT()    do{ recom_nodeex(RECOM, NOP_PARENT); }while(0)
 #define NDISABLE()  do{ recom_nodeex(RECOM, NOP_DISABLE); }while(0)
 #define NENABLE()   do{ recom_nodeex(RECOM, NOP_ENABLE); }while(0)
+#define ERROR(D,N)  do{ recom_error(RECOM, D, N); } while(0)
 #define START(S)    do{ recom_start(RECOM, S); }while(0)
 #define MAKE()      recom_make(RECOM)
 
