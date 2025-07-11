@@ -58,10 +58,10 @@ cmd   : sep? cmdsym
 cmdlbl: label cmd;
 cmdfn : decfn cmd;
 
-command: sep? cmdfn
+command: sep? decrange
+       | sep? cmdfn
        | sep? cmdlbl
        | cmd
-       | sep? decrange
        ;
 
 progline-: emptyline
@@ -274,8 +274,8 @@ __private void def_label(recom_s* rc){
 	LABEL(L[0]);	SPLIT(L[2]);
 					CALL("colon");
 					RET(1);
-	LABEL(L[1]);	ERROR(1, LIPSASM_ERROR_INVALID_LABEL_NAME);
-	LABEL(L[2]);	ERROR(1, LIPSASM_ERROR_ASPECTED_COLON);
+	LABEL(L[1]);	ERROR(0, LIPSASM_ERROR_INVALID_LABEL_NAME);
+	LABEL(L[2]);	ERROR(0, LIPSASM_ERROR_ASPECTED_COLON);
 }
 
 //decfn     : fn (plus|minus|$[1]) fnname);
@@ -431,10 +431,10 @@ __private void def_cmdfn(recom_s* rc){
 					RET(1);
 }
 
-//command: sep? cmdfn
+//command: sep? decrange
+//       | sep? cmdfn
 //       | sep? cmdlbl
 //       | cmd
-//       | sep? decrange
 //       ;
 __private void def_command(recom_s* rc){
 	INIT(rc);
@@ -443,15 +443,15 @@ __private void def_command(recom_s* rc){
 					SPLIT(L[0]);
 					CALL("sep");
 	LABEL(L[0]);	SPLIT(L[2]);
-					CALL("cmdfn");
+					CALL("decrange");
 					JMP(L[1]);
 	LABEL(L[2]);	SPLIT(L[3]);
-					CALL("cmdlbl");
+					CALL("cmdfn");
 					JMP(L[1]);
 	LABEL(L[3]);	SPLIT(L[4]);
-					CALL("cmd");
+					CALL("cmdlbl");
 					JMP(L[1]);
-	LABEL(L[4]);	CALL("decrange");
+	LABEL(L[4]);	CALL("cmd");
 	LABEL(L[1]);	RET(1);
 }
 
