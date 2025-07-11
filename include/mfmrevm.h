@@ -31,6 +31,10 @@
 #define LIPS_MAX_CAPTURE 128
 #define LIPS_NODE_START  UINT16_MAX
 
+#define LIPS_ERROR_DIE 0x80
+
+#define LIPS_ERR_UNKNOW_SYMBOL 0x00
+
 typedef enum{
 	OP_MATCH  = 0x0000,
 	OP_CHAR   = 0x1000,
@@ -48,6 +52,7 @@ typedef enum{
 	OPE_SAVE   = 0x0000,
 	OPE_RET    = 0x0100,
 	OPE_NODEEX = 0x0200,
+	OPE_ERROR  = 0x0F00
 }revmOP_e;
 
 typedef enum{
@@ -71,19 +76,24 @@ typedef struct lipsAst{
 	uint16_t        id;
 }lipsAst_s;
 
-
+typedef struct lipsError{
+	const utf8_t* loc;
+	uint8_t       number;
+}lipsError_s;
 
 typedef struct lipsMatch{
+	lipsError_s*  err;
 	lipsAst_s*    ast;
 	const utf8_t* capture[LIPS_MAX_CAPTURE * 2];
 	int           match;
 }lipsMatch_s;
 
-lipsMatch_s lips_match(uint16_t* bytecode, const utf8_t* txt);
+int lips_match(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret);
 const char** lips_map_name(const uint16_t* bytecode);
-void lips_debug(uint16_t* bytecode, const utf8_t* txt);
-
+int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret);
 lipsAst_s* lips_ast_make(bcnode_s* node);
+void lips_dump_capture(lipsMatch_s* m, FILE* f);
+void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int dot);
 
 #endif
 

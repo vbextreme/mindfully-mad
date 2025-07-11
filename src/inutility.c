@@ -92,3 +92,30 @@ char* load_file(const char* path){
 	return buffer;
 }
 
+const char* cast_view_char(unsigned ch, int convertnumerical){
+	static char tmp[64];
+	tmp[0] = 0;
+	tmp[1] = 0;
+	if( ch == '\n' ){
+		return "↵";
+	}
+	else if( ch == '\t' ){
+		return "→";
+	}
+	else if( ch == ' '  ){
+		return "␣";
+	}
+	else if( ch < 32 ){
+		if( convertnumerical ) sprintf(tmp, "%3d", ch);
+	}
+	else if( ch < 128 ) {
+		tmp[0] = ch;
+	}
+	else if( convertnumerical ){
+		sprintf(tmp, "%3d", ch);
+	}
+	return tmp;
+}
+
+
+

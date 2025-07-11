@@ -32,7 +32,7 @@ __private lipsAst_s* recast(bcnode_s* node){
 				iassert(disable);
 				--disable;
 			break;
-
+			
 			case NOP_DISABLE: ++disable; break;
 		}
 	}

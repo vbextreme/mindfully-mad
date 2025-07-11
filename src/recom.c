@@ -220,7 +220,15 @@ recom_s* recom_ret(recom_s* rc, int fn){
 }
 
 recom_s* recom_nodeex(recom_s* rc, nodeOP_e op){
-	rc->bytecode[m_ipush(&rc->bytecode)] = OP_EXT | OPE_NODEEX | op;
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_EXT | OPE_NODEEX | op;
+	return rc;
+}
+
+recom_s* recom_error(recom_s* rc, uint8_t die, uint8_t num){
+	if( die ) num |= LIPS_ERROR_DIE;
+	unsigned i = m_ipush(&rc->bytecode);
+	rc->bytecode[i] = OP_EXT | OPE_ERROR | num;
 	return rc;
 }
 

@@ -3,6 +3,7 @@
 #include <mfmrevm.h>
 #include <readline/readline.h>
 #include <notstd/str.h>
+#include <inutility.h>
 
 /*
 
@@ -261,7 +262,6 @@ regex vm stack based
 
 */
 
-
 typedef struct lipsStack{
 	unsigned      pc;
 	const utf8_t* sp;
@@ -276,6 +276,7 @@ typedef struct lips{
 	uint16_t*      range;
 	uint16_t*      code;
 	lipsStack_s*   stack;
+	lipsError_s*   errors;
 	const utf8_t*  save[LIPS_MAX_CAPTURE*2];
 	unsigned*      cstk;
 	bcnode_s*      node;
@@ -307,9 +308,17 @@ __private lips_s* lips_ctor(lips_s* vm, uint16_t* bytecode, const utf8_t* txt){
 	vm->stack    = MANY(lipsStack_s, vm->bytecodeLen);
 	vm->cstk     = MANY(unsigned, 128);
 	vm->node     = MANY(bcnode_s, 32);
+	vm->errors   = MANY(lipsError_s, 16);
 	vm->ls       = -1;
 	memset(vm->save, 0, sizeof vm->save);
 	return vm;
+}
+
+__private void lips_dtor(lips_s* vm){
+	m_free(vm->stack);
+	m_free(vm->cstk);
+	m_free(vm->node);
+	m_free(vm->errors);
 }
 
 __private void stk_push(lips_s* vm, unsigned pc, const utf8_t* sp){
@@ -376,10 +385,11 @@ __private void cret(lips_s* vm, int fail){
 	}
 }
 
-__private void lips_dtor(lips_s* vm){
-	m_free(vm->stack);
-	m_free(vm->cstk);
-	m_free(vm->node);
+__private void cerror(lips_s* vm, uint8_t num){
+	unsigned i = m_ipush(&vm->errors);
+	vm->errors[i].loc    = vm->sp;
+	vm->errors[i].number = num;
+	if( num & LIPS_ERROR_DIE ) m_header(vm->stack)->len = 0;
 }
 
 __private void node(lips_s* vm, nodeOP_e op, unsigned id){
@@ -403,11 +413,17 @@ __private int vm_exec(lips_s* vm, lipsMatch_s* ret){
 			if( *vm->sp == BYTECODE_VAL08(byc) ){
 				stk_push(vm, vm->pc+1, vm->sp+1);
 			}
+			else{
+				cerror(vm, LIPS_ERR_UNKNOW_SYMBOL);
+			}
 		break;
 		
 		case OP_RANGE:
 			if( range(vm, BYTECODE_VAL12(byc), *vm->sp) ){
 				stk_push(vm, vm->pc+1, vm->sp+1);
+			}
+			else{
+				cerror(vm, LIPS_ERR_UNKNOW_SYMBOL);
 			}
 		break;
 		
@@ -467,20 +483,28 @@ __private int vm_exec(lips_s* vm, lipsMatch_s* ret){
 					node(vm, BYTECODE_VAL08(byc), 0);
 					stk_push(vm, vm->pc+1, vm->sp);
 				break;
+				
+				case OPE_ERROR:
+					cerror(vm, BYTECODE_VAL08(byc));
+				break;
 			}
 		break;
 	}
 	return -1;
 }
 
-lipsMatch_s lips_match(uint16_t* bytecode, const utf8_t* txt){
-	lipsMatch_s ret = {.match = 0, .ast = NULL};
+int lips_match(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
+	ret->match = 0;
+   	ret->ast   = NULL;
+	ret->err   = NULL;
+	
 	lips_s vm;
 	lips_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
-	while( stk_pop(&vm) && vm_exec(&vm, &ret) );
+	while( stk_pop(&vm) && vm_exec(&vm, ret) );
+	if( ret->match < 1 ) ret->err = m_borrowed(vm.errors);
 	lips_dtor(&vm);
-	return ret;
+	return ret->match;
 }
 
 const char** lips_map_name(const uint16_t* bytecode){
@@ -609,14 +633,8 @@ __private void term_cline(unsigned len){
 #define DBG_CAPTURE_W (DBG_SCREEN_W/4-1)
 
 __private void putc_view_char(unsigned ch){
-	if( ch == '\n' ) fputs("↵", stdout);
-	else if( ch == '\t' ) fputs("→", stdout);
-	else if( ch == ' '  ) fputs("␣", stdout);
-	else if( ch < 32 ) printf("%3d", ch);
-	else if( ch < 128 ) putchar(ch);
-	else printf("%3d", ch);
+	fputs(cast_view_char(ch, 1), stdout);
 }
-
 
 __private void draw_cx_line(unsigned box){
 	term_box(7); term_hline(DBG_STACK_W); term_box(box);
@@ -925,23 +943,22 @@ __private void redraw(lips_s* vm, const utf8_t* txt, unsigned len, const char** 
 	fflush(stdout);
 }
 
-__private void ast_dump_stdout(lipsAst_s* ast, const char** nmap, unsigned tab){
+__private void ast_dump_file(lipsAst_s* ast, const char** nmap, unsigned tab, FILE* f){
 	for( unsigned i = 0; i < tab; ++i ){
-		putchar(' ');
-		putchar(' ');
+		fputs("  ", f);
 	}
 	if( m_header(ast->child)->len ){
-		printf("<%s>\n", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		fprintf(f, "<%s>\n", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		mforeach(ast->child,i){
-			ast_dump_stdout(&ast->child[i], nmap, tab+1);
+			ast_dump_file(&ast->child[i], nmap, tab+1, f);
 		}
 	}
 	else{
-		printf("<%s> '", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		fprintf(f, "<%s> '", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		for( unsigned i = 0; i < ast->len; ++i ){
-			putc_view_char(ast->sp[i]);
+			fputs(cast_view_char(ast->sp[i], 0), f);
 		}
-		printf("'\n");
+		fputs("'\n", f);
 	}
 }
 
@@ -958,23 +975,13 @@ __private void dump_dot(lipsAst_s* ast, const char** nmap, FILE* f, const char* 
 	else{
 		fprintf(f, "%s [label=\"%s\\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		for( unsigned i = 0; i < ast->len; ++i ){
-			if( ast->sp[i] == '\n' ){
-				fputs("\\n", f);
-			}
-			else if( ast->sp[i] == '\t' ){
-				fputs("\\t", f);
-			}
-			else{
-				fputc(ast->sp[i], f);
-			}
+			fputs(cast_view_char(ast->sp[i], 0), f);
 		}
 		fprintf(f, "\"];\n");
 	}
 }
 
-__private void ast_dump_dot(lipsAst_s* ast, const char** nmap){
-	FILE* f = fopen("ast.dot", "w");
-	if( !f ) die("unable to create file: %m");
+__private void ast_dump_dot(lipsAst_s* ast, const char** nmap, FILE* f){
 	fputs("digraph {\n", f);
 	dump_dot(ast, nmap, f, "", 0);
 	fputs("}\n", f);
@@ -989,8 +996,11 @@ __private long find_bp(uint32_t* bp, uint32_t val){
 	return -1;
 }
 
-void lips_debug(uint16_t* bytecode, const utf8_t* txt){
-	lipsMatch_s ret = {.match = 0, .ast = NULL};
+int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
+	ret->match = 0;
+	ret->ast   = NULL;
+	ret->err   = NULL;
+
 	lips_s vm;
 	lips_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
@@ -1043,35 +1053,37 @@ void lips_debug(uint16_t* bytecode, const utf8_t* txt){
 			}
 			free(str);
 		}
-	}while( stk_pop(&vm) && vm_exec(&vm, &ret) );
-
+	}while( stk_pop(&vm) && vm_exec(&vm, ret) );
 	term_cls();
-	if( ret.match == 0 ){
-		puts("no match");
-	}
-	else if( ret.match < 0 ){
-		puts("error");
-	}
-	else{
-		for( int i = 0; i < ret.match; ++i ){
-			unsigned st = i*2;
-			unsigned en = st+1;
-			unsigned len = ret.capture[en] - ret.capture[st];
-			printf("capture[0]: '%.*s'\n", len, ret.capture[st]);
-		}
-		if( ret.ast ){
-			ast_dump_stdout(ret.ast, nmap, 0);
-			ast_dump_dot(ret.ast, nmap);
-		}
-	}
+	if( ret->match < 1 ) ret->err = m_borrowed(vm.errors);
 	lips_dtor(&vm);
+	return ret->match;
 }
 
+void lips_dump_capture(lipsMatch_s* m, FILE* f){
+	if( m->match == 0 ){
+		fputs("lips capture: no match\n", f);
+	}
+	else if( m->match < 0 ){
+		fputs("lips capture: error, this never append for now\n", f);
+	}
+	else{
+		for( int i = 0; i < m->match; ++i ){
+			unsigned st = i*2;
+			unsigned en = st+1;
+			unsigned len = m->capture[en] - m->capture[st];
+			fprintf(f, "capture[0]: '%.*s'\n", len, m->capture[st]);
+		}
+	}
+}
 
-
-
-
-
+void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int dot){
+	__free const char** nmap = lips_map_name(bytecode);
+	if( !m->ast ) return;
+	if( m->match < 1 ) return;
+	if( term ) ast_dump_file(m->ast, nmap, 0, f);
+	if( dot  ) ast_dump_dot(m->ast, nmap, f);
+}
 
 
 
