@@ -7,10 +7,8 @@
 GRAMMAR: lipsasm;
 
 ERROR[1]: 'apsected + or -'
-ERROR[2]: 'aspected colon after label or function'
-ERROR[3]: 'invalid label name'
-ERROR[4]: 'unaspected token'
-ERROR[5]: 'invalid argument'
+ERROR[2]: 'unaspected token'
+ERROR[3]: 'invalid argument'
 
 num   : '[0-9]+';
 word  : '[a-zA-Z_]+[a-zA-Z0-9]*';
@@ -37,7 +35,7 @@ char  : '\'' escape '\''
 
 emptyline-: sep? endl;
 comment-  : comma any;
-label     : (word|$[3]) sep? (colon|$[2]);
+label     : (word|$[3]) sep? colon;
 decfn     : fn (plus|minus|$[1]) fnname);
 endcmd    : sep? comment
           | sep? endl
@@ -48,7 +46,7 @@ decrange  : dec dot range '[' num ']' sep? colon sep? chclass endcmd
 arg   : char
       | num
       | word
-      | $[5]
+      | $[3]
       ;
 cmdsym: word endcmd;
 cmdarg: word sep arg endcmd;
@@ -64,21 +62,22 @@ command: sep? decrange
        | cmd
        ;
 
+endprogram-@: '\0';
+
 progline-: emptyline
          | sep? comment
          | command
-         | $[4]
+         | endprogram
+         | $[2]
          ;
 
 program: progline+;
-_start_: program;
+_start_@: program;
 */
 
 #define LIPSASM_ERROR_ASPECTED_STORE_FN  0x01
-#define LIPSASM_ERROR_ASPECTED_COLON     0x02
-#define LIPSASM_ERROR_INVALID_LABEL_NAME 0x03
-#define LIPSASM_ERROR_UNASPECTED_TOKEN   0x04
-#define LIPSASM_ERROR_INVALID_ARGUMENT   0x05
+#define LIPSASM_ERROR_UNASPECTED_TOKEN   0x02
+#define LIPSASM_ERROR_INVALID_ARGUMENT   0x03
 
 __private void token_class(recom_s* rc, const char* fnname, const char* accept, unsigned rev, unsigned store){
 	INIT(rc);
@@ -262,20 +261,16 @@ __private void def_comment(recom_s* rc){
 	RET(0);
 }
 
-//label     : (word|$[3]) sep? (colon|$[2]);
+//label     : word sep? colon;
 __private void def_label(recom_s* rc){
 	INIT(rc);
 	FN("label", 1);
-	USELBL(3);
-					SPLIT(L[1]);
+	USELBL(1);
 					CALL("word");
 					SPLIT(L[0]);
 					CALL("sep");
-	LABEL(L[0]);	SPLIT(L[2]);
-					CALL("colon");
+	LABEL(L[0]);	CALL("colon");
 					RET(1);
-	LABEL(L[1]);	ERROR(0, LIPSASM_ERROR_INVALID_LABEL_NAME);
-	LABEL(L[2]);	ERROR(0, LIPSASM_ERROR_ASPECTED_COLON);
 }
 
 //decfn     : fn (plus|minus|$[1]) fnname);
@@ -455,15 +450,25 @@ __private void def_command(recom_s* rc){
 	LABEL(L[1]);	RET(1);
 }
 
+//endprogram-@: '\0';
+__private void def_endprogram(recom_s* rc){
+	INIT(rc);
+	FN("endprogram", 0);
+					CHAR('\0');
+					MATCH();
+					RET(0);
+}
+
 //progline-: emptyline
 //         | sep? comment
 //         | command
+//         | endprogram
 //         | $[4]
 //         ;
 __private void def_progline(recom_s* rc){
 	INIT(rc);
 	FN("progline", 0);
-	USELBL(5);
+	USELBL(6);
 					SPLIT(L[1]);
 					CALL("emptyline");
 					JMP(L[0]);
@@ -475,7 +480,10 @@ __private void def_progline(recom_s* rc){
 	LABEL(L[2]);	SPLIT(L[4]);
 					CALL("command");
 					JMP(L[0]);
-	LABEL(L[4]);	ERROR(1, LIPSASM_ERROR_UNASPECTED_TOKEN);
+	LABEL(L[4]);	SPLIT(L[5]);
+					CALL("endprogram");
+					JMP(L[0]);
+	LABEL(L[5]);	ERROR(1, LIPSASM_ERROR_UNASPECTED_TOKEN);
 	LABEL(L[0]);	RET(0);
 }
 
@@ -526,6 +534,7 @@ uint16_t* reasmgram_make(void){
 	def_cmdlbl(ROBJ());
 	def_cmdfn(ROBJ());
 	def_command(ROBJ());
+	def_endprogram(ROBJ());
 	def_progline(ROBJ());
 	def_program(ROBJ());
 	START(0);

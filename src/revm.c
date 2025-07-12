@@ -1147,6 +1147,7 @@ int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
 	l.source = txt;
 	l.srclen = strlen((char*)txt);
 	l.run = DCMD_SUSPEND;
+	l.next[0] = l.next[1] = -1;
 
 	draw_clear();
 	do{
@@ -1156,6 +1157,7 @@ int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
 		if( l.run == DCMD_QUIT ) break;
 	}while( stk_pop(&l.vm) && vm_exec(&l.vm, ret) );
 	term_cls();
+	fflush(stdout);
 	if( ret->match < 1 ) ret->err = m_borrowed(l.vm.errors);
 	lips_dtor(&l.vm);
 	m_free(l.nmap);
@@ -1178,6 +1180,7 @@ void lips_dump_capture(lipsMatch_s* m, FILE* f){
 			fprintf(f, "<capture%u>%.*s</capture%u>\n", i, len, m->capture[st], i);
 		}
 	}
+	fflush(f);
 }
 
 void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int dot){
@@ -1186,6 +1189,7 @@ void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int do
 	if( m->match < 1 ) return;
 	if( term ) ast_dump_file(m->ast, nmap, 0, f);
 	if( dot  ) ast_dump_dot(m->ast, nmap, f);
+	fflush(f);
 }
 
 __private int sort_err(const void* a, const void* b){
@@ -1233,6 +1237,7 @@ void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
 			fprintf(f, "lips error: match not have mark any type of error but not have match\n");
 		}
 	}
+	fflush(f);
 }
 
 
