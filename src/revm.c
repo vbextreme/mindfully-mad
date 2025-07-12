@@ -1000,9 +1000,7 @@ __private void ast_dump_dot(lipsAst_s* ast, const char** nmap, FILE* f){
 	fputs("digraph {\n", f);
 	dump_dot(ast, nmap, f, "", 0);
 	fputs("}\n", f);
-	fclose(f);
 }
-
 
 __private long find_bp(uint32_t* bp, uint32_t val){
 	mforeach(bp, i)

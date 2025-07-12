@@ -37,6 +37,7 @@ option_s opt[] = {
 __private FILE* argfopen(const char* path, const char* mode){
 	if( !strcmp(path, "stdout") ) return stdout;
 	if( !strcmp(path, "stderr") ) return stderr;
+	dbg_info("OPEN %s", path);
 	FILE* ret = fopen(path, mode);
 	if( !ret ) die("unable to open file '%s': %m", path);
 	return ret;
