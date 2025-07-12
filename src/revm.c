@@ -276,7 +276,7 @@ typedef struct lips{
 	uint16_t*      range;
 	uint16_t*      code;
 	lipsStack_s*   stack;
-	lipsError_s*   errors;
+	lipsError_s    error;
 	const utf8_t*  save[LIPS_MAX_CAPTURE*2];
 	unsigned*      cstk;
 	bcnode_s*      node;
@@ -308,8 +308,9 @@ __private lips_s* lips_ctor(lips_s* vm, uint16_t* bytecode, const utf8_t* txt){
 	vm->stack    = MANY(lipsStack_s, vm->bytecodeLen);
 	vm->cstk     = MANY(unsigned, 128);
 	vm->node     = MANY(bcnode_s, 32);
-	vm->errors   = MANY(lipsError_s, 16);
 	vm->ls       = -1;
+	vm->error.loc    = NULL;
+	vm->error.number = 0;
 	memset(vm->save, 0, sizeof vm->save);
 	return vm;
 }
@@ -318,7 +319,6 @@ __private void lips_dtor(lips_s* vm){
 	m_free(vm->stack);
 	m_free(vm->cstk);
 	m_free(vm->node);
-	m_free(vm->errors);
 }
 
 __private void stk_push(lips_s* vm, unsigned pc, const utf8_t* sp){
@@ -386,10 +386,9 @@ __private void cret(lips_s* vm, int fail){
 }
 
 __private void cerror(lips_s* vm, uint8_t num){
-	unsigned i = m_ipush(&vm->errors);
-	vm->errors[i].loc    = vm->sp;
-	vm->errors[i].number = num;
-	if( num & LIPS_ERROR_DIE ) m_header(vm->stack)->len = 0;
+	vm->error.loc    = vm->sp;
+	vm->error.number = num;
+	m_header(vm->stack)->len = 0;
 }
 
 __private void node(lips_s* vm, nodeOP_e op, unsigned id){
@@ -496,13 +495,12 @@ __private int vm_exec(lips_s* vm, lipsMatch_s* ret){
 int lips_match(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
 	ret->match = 0;
    	ret->ast   = NULL;
-	ret->err   = NULL;
 	
 	lips_s vm;
 	lips_ctor(&vm, bytecode, txt);
 	stk_push(&vm, vm.sectionStart, vm.sp);
 	while( stk_pop(&vm) && vm_exec(&vm, ret) );
-	if( ret->match < 1 ) ret->err = m_borrowed(vm.errors);
+	ret->err = vm.error;
 	lips_dtor(&vm);
 	return ret->match;
 }
@@ -1020,7 +1018,7 @@ __private void action_next(lipsdbg_s* l, __unused char** args){
 		return;
 	}
 	l->next[0] = l->vm.stack[l->curstk-1].pc + 1;
-	l->next[1] = l->curstk > 1 ? l->vm.stack[l->curstk-2].pc: -1;
+	l->next[1] = l->curstk > 1 ? (long)l->vm.stack[l->curstk-2].pc: -1;
 	l->run = DCMD_CONTINUE;
 }
 
@@ -1094,7 +1092,7 @@ cmdmap_s CMD[] = {{
 
 long debug_command_arg_address(const char* from, unsigned byclen){
 	unsigned ret = strtoul(from, NULL, 16);
-	return ret < byclen ? ret: -1;
+	return ret < byclen ? (long)ret: -1;
 }
 
 __private void debug_command(lipsdbg_s* l){
@@ -1135,7 +1133,6 @@ __private void debug_command(lipsdbg_s* l){
 int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
 	ret->match = 0;
 	ret->ast   = NULL;
-	ret->err   = NULL;
 	
 	lipsdbg_s l;
 	lips_ctor(&l.vm, bytecode, txt);
@@ -1156,7 +1153,7 @@ int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret){
 	}while( stk_pop(&l.vm) && vm_exec(&l.vm, ret) );
 	term_cls();
 	fflush(stdout);
-	if( ret->match < 1 ) ret->err = m_borrowed(l.vm.errors);
+	ret->err = l.vm.error;
 	lips_dtor(&l.vm);
 	m_free(l.nmap);
 	m_free(l.breakpoint);
@@ -1190,14 +1187,6 @@ void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int do
 	fflush(f);
 }
 
-__private int sort_err(const void* a, const void* b){
-	const lipsError_s* ea = a;
-	const lipsError_s* eb = b;
-	if( ea->loc < eb->loc ) return -1;
-	if( ea->loc > eb->loc ) return 1;
-	return 0;
-}
-
 void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
 	if( m->match < 0 ){
 		fprintf(f, "lips error: internal error, this never append for now\n");
@@ -1205,35 +1194,26 @@ void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
 	else if( m->match > 0 ){
 		fprintf(f, "lips error: no errors, lips have match\n");
 	}
+	else if( m->err.number ){
+		fprintf(f, "lips fail: %u\n", m->err.number);
+		const char*    sp    = (const char*)m->err.loc;
+		const unsigned len   = strlen((const char*)source);
+		const unsigned iline = count_line_to((const char*)source, sp);
+		unsigned       offv  = fprintf(f, "%04u | ", iline);
+		const char*    eline = NULL;
+		const char*    sline = extract_line((const char*)source, (const char*)source+len, sp, &eline);
+		for( const char* p = sline; p < eline; ++p ){
+			fputs(cast_view_char(*p, 0), f);
+			if( p < sp ) ++offv;
+		}
+		fputc('\n', f);
+		for( unsigned i = 0; i < offv; ++i ){
+			fputc(' ', f);
+		}
+		fputs("^\n", f);
+	}
 	else{
-		unsigned const count = m_header(m->err)->len;
-		if( count ){
-			if( !(m->err[count-1].number & LIPS_ERROR_DIE) ){
-				m_qsort(m->err, sort_err);
-			}
-			unsigned num  = m->err[count-1].number;
-			unsigned fail = num & LIPS_ERROR_DIE;
-			num &= ~LIPS_ERROR_DIE;
-			fprintf(f, "lips %s: %u\n", fail?"fail":"error", num);
-			const char*    sp    = (const char*)m->err[count-1].loc;
-			const unsigned len   = strlen((const char*)source);
-			const unsigned iline = count_line_to((const char*)source, sp);
-			unsigned       offv  = fprintf(f, "%04u | ", iline);
-			const char*    eline = NULL;
-			const char*    sline = extract_line((const char*)source, (const char*)source+len, sp, &eline);
-			for( const char* p = sline; p < eline; ++p ){
-				fputs(cast_view_char(*p, 0), f);
-				if( p < sp ) ++offv;
-			}
-			fputc('\n', f);
-			for( unsigned i = 0; i < offv; ++i ){
-				fputc(' ', f);
-			}
-			fputs("^\n", f);
-		}
-		else{
-			fprintf(f, "lips error: match not have mark any type of error but not have match\n");
-		}
+		fprintf(f, "lips error: match not have mark any type of error but not have match\n");
 	}
 	fflush(f);
 }

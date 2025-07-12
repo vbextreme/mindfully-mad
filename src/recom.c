@@ -11,13 +11,15 @@ recom_s* recom_ctor(recom_s* rc){
 	rc->call     = MANY(recfn_s, 16);
 	rc->range    = MANY(recrange_s, 16);
 	rc->urange   = MANY(recurange_s, 16);
-	
+	rc->errstr   = MANY(char*, 16);
 	recrange_s any;
 	recom_range_ctor(&any);
 	recom_range_set(&any, 0);
 	recom_range_reverse(&any);
 	recom_range_add(rc, &any);
 	recom_label_new(rc);
+	unsigned i = m_ipush(&rc->errstr);
+	rc->errstr[i] = str_dup("ok",0);
 	return rc;
 }
 
@@ -30,6 +32,7 @@ void recom_dtor(recom_s* rc){
 	m_free(rc->fn);
 	mforeach(rc->call, i) m_free(rc->call[i].name);
 	m_free(rc->call);
+	mforeach(rc->errstr, i) m_free(rc->errstr[i]);
 }
 
 recom_s* recom_match(recom_s* rc){
@@ -225,8 +228,13 @@ recom_s* recom_nodeex(recom_s* rc, nodeOP_e op){
 	return rc;
 }
 
-recom_s* recom_error(recom_s* rc, uint8_t die, uint8_t num){
-	if( die ) num |= LIPS_ERROR_DIE;
+unsigned recom_error_add(recom_s* rc, const char* str){
+	unsigned i = m_ipush(&rc->errstr);
+	rc->errstr[i] = str_dup(str, 0);
+	return i;
+}
+
+recom_s* recom_error(recom_s* rc, uint8_t num){
 	unsigned i = m_ipush(&rc->bytecode);
 	rc->bytecode[i] = OP_EXT | OPE_ERROR | num;
 	return rc;

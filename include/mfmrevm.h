@@ -82,7 +82,7 @@ typedef struct lipsError{
 }lipsError_s;
 
 typedef struct lipsMatch{
-	lipsError_s*  err;
+	lipsError_s   err;
 	lipsAst_s*    ast;
 	const utf8_t* capture[LIPS_MAX_CAPTURE * 2];
 	int           match;

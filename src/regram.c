@@ -4,11 +4,11 @@
 #include <notstd/str.h>
 
 /*
-GRAMMAR: lipsasm;
+@GRAMMAR lipsasm;
 
-ERROR[1]: 'apsected + or -'
-ERROR[2]: 'unaspected token'
-ERROR[3]: 'invalid argument'
+@ERROR[1] 'apsected + or -';
+@ERROR[2] 'unaspected token';
+@ERROR[3] 'invalid argument';
 
 num   : '[0-9]+';
 word  : '[a-zA-Z_]+[a-zA-Z0-9]*';
@@ -286,7 +286,7 @@ __private void def_decfn(recom_s* rc){
 					CALL("minus");
 	LABEL(L[0]);	CALL("label");
 					RET(1);
-	LABEL(L[2]);	ERROR(1, LIPSASM_ERROR_ASPECTED_STORE_FN);
+	LABEL(L[2]);	ERROR(LIPSASM_ERROR_ASPECTED_STORE_FN);
 }
 
 //endcmd    : sep? comment
@@ -368,7 +368,7 @@ __private void def_arg(recom_s* rc){
 	LABEL(L[2]);	SPLIT(L[3]);
 					CALL("word");
 					JMP(L[0]);
-	LABEL(L[3]);	ERROR(1, LIPSASM_ERROR_INVALID_ARGUMENT);
+	LABEL(L[3]);	ERROR(LIPSASM_ERROR_INVALID_ARGUMENT);
 	LABEL(L[0]);	RET(1);
 }
 
@@ -483,7 +483,7 @@ __private void def_progline(recom_s* rc){
 	LABEL(L[4]);	SPLIT(L[5]);
 					CALL("endprogram");
 					JMP(L[0]);
-	LABEL(L[5]);	ERROR(1, LIPSASM_ERROR_UNASPECTED_TOKEN);
+	LABEL(L[5]);	ERROR(LIPSASM_ERROR_UNASPECTED_TOKEN);
 	LABEL(L[0]);	RET(0);
 }
 
