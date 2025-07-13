@@ -1,8 +1,7 @@
-#ifndef __MFM_REVM_H__
-#define __MFM_REVM_H__
+#ifndef __LIPS_BYTECODE_H__
+#define __LIPS_BYTECODE_H__
 
 #include <notstd/core.h>
-#include <notstd/utf8.h>
 
 #define BYTECODE_FORMAT   0xEE1A
 #define BYC_FORMAT         0x0
@@ -14,8 +13,8 @@
 #define BYC_START          0x6
 #define BYC_CODELEN        0x7
 #define BYC_SECTION_FN     0x8
-#define BYC_SECTION_ERROR  0x9
-#define BYC_SECTION_NAME   0xA
+#define BYC_SECTION_NAME   0x9
+#define BYC_SECTION_ERROR  0xA
 #define BYC_SECTION_RANGE  0xB
 #define BYC_SECTION_URANGE 0xC
 #define BYC_SECTION_CODE   0xD
@@ -32,10 +31,6 @@
 
 #define LIPS_MAX_CAPTURE 128
 #define LIPS_NODE_START  UINT16_MAX
-
-#define LIPS_ERROR_DIE 0x80
-
-#define LIPS_ERR_UNKNOW_SYMBOL 0x7F
 
 typedef enum{
 	OP_MATCH  = 0x0000,
@@ -55,48 +50,35 @@ typedef enum{
 	OPE_RET    = 0x0100,
 	OPE_NODEEX = 0x0200,
 	OPE_ERROR  = 0x0F00
-}revmOP_e;
+}lipsOP_e;
 
-typedef enum{
-	NOP_NEW,
-	NOP_PARENT,
-	NOP_DISABLE,
-	NOP_ENABLE
-}nodeOP_e;
+typedef struct lipsByc{
+	uint16_t*    bytecode;
+	uint16_t*    fn;
+	uint16_t*    range;
+	uint16_t*    urange;
+	uint16_t*    code;
+	const char** fnName;
+	const char** errStr;
+	uint16_t     format;
+	uint16_t     flags;
+	uint16_t     rangeCount;
+	uint16_t     urangeCount;
+	uint16_t     fnCount;
+	uint16_t     errCount;
+	uint16_t     start;
+	uint16_t     codeLen;
+	uint16_t     sectionFn;
+	uint16_t     sectionError;
+	uint32_t     sectionName;
+	uint16_t     sectionRange;
+	uint16_t     sectionURange;
+	uint16_t     sectionCode;
+}lipsByc_s;
 
-typedef struct bcnode{
-	nodeOP_e      op;
-	uint16_t      id;
-	const utf8_t* sp;
-}bcnode_s;
+lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode);
+void lipsByc_dtor(lipsByc_s* byc);
 
-typedef struct lipsAst{
-	struct lipsAst* parent;
-	struct lipsAst* child;
-	const utf8_t*   sp;
-	unsigned        len;
-	uint16_t        id;
-}lipsAst_s;
 
-typedef struct lipsError{
-	const utf8_t* loc;
-	uint8_t       number;
-}lipsError_s;
-
-typedef struct lipsMatch{
-	lipsError_s   err;
-	lipsAst_s*    ast;
-	const utf8_t* capture[LIPS_MAX_CAPTURE * 2];
-	int           match;
-}lipsMatch_s;
-
-int lips_match(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret);
-const char** lips_map_name(const uint16_t* bytecode);
-int lips_debug(uint16_t* bytecode, const utf8_t* txt, lipsMatch_s* ret);
-lipsAst_s* lips_ast_make(bcnode_s* node);
-void lips_dump_capture(lipsMatch_s* m, FILE* f);
-void lips_dump_ast(lipsMatch_s* m, uint16_t* bytecode, FILE* f, int term, int dot);
-void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f);
 
 #endif
-

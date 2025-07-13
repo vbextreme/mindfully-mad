@@ -274,6 +274,11 @@ uint16_t* recom_make(recom_s* rc){
 		len = ROUND_UP(len, 2);
 		totalheader += len;
 	}
+	mforeach(rc->errstr, i){
+		unsigned len = strlen(rc->errstr[i]);
+		len = ROUND_UP(len, 2);
+		totalheader += len;
+	}
 	
 	unsigned totalbc = totalheader + m_header(rc->bytecode)->len;
 	uint16_t* bc = MANY(uint16_t, totalbc);
@@ -282,24 +287,16 @@ uint16_t* recom_make(recom_s* rc){
 	bc[BYC_RANGE_COUNT]  = m_header(rc->range)->len;
 	bc[BYC_URANGE_COUNT] = m_header(rc->urange)->len;
 	bc[BYC_FN_COUNT]     = m_header(rc->fn)->len;
+	bc[BYC_ERR_COUNT]    = m_header(rc->errstr)->len;
 	bc[BYC_START]        = rc->label[0].address;
 	bc[BYC_CODELEN]      = m_header(rc->bytecode)->len;
-	
-	//.section fn
 	uint16_t* inc = &bc[BYC_HEADER_SIZE];
+	//.section fn
 	bc[BYC_SECTION_FN] = inc - bc;
 	mforeach(rc->fn, i){
 		if( rc->fn[i].addr > UINT16_MAX ) die("linker error: function call outside address %u", rc->fn[i].addr);
 		*inc++ = rc->fn[i].addr;
 	}
-	//.section range
-	bc[BYC_SECTION_RANGE] = inc - bc;
-	mforeach(rc->range, i){
-		memcpy(inc, rc->range[i].map, sizeof rc->range[i].map);
-		inc += (sizeof rc->range[i].map)/2;
-	}
-	//.section urange
-	bc[BYC_SECTION_URANGE] = inc - bc;
 	//.section name
 	bc[BYC_SECTION_NAME] = inc - bc;
 	mforeach(rc->fn, i){
@@ -309,7 +306,23 @@ uint16_t* recom_make(recom_s* rc){
 		len /= 2;
 		inc += len;
 	}
-	
+	//.section err
+	bc[BYC_SECTION_ERROR] = inc - bc;
+	mforeach(rc->errstr, i){
+		unsigned len = strlen(rc->errstr[i])+1;
+		memcpy(inc, rc->errstr[i], len);
+		len = ROUND_UP(len, 2);
+		len /= 2;
+		inc += len;
+	}	
+	//.section range
+	bc[BYC_SECTION_RANGE] = inc - bc;
+	mforeach(rc->range, i){
+		memcpy(inc, rc->range[i].map, sizeof rc->range[i].map);
+		inc += (sizeof rc->range[i].map)/2;
+	}
+	//.section urange
+	bc[BYC_SECTION_URANGE] = inc - bc;
 	//linker
 	mforeach(rc->label, it){
 		if( rc->label[it].address == -1 ){
