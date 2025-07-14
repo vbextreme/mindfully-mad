@@ -1,0 +1,134 @@
+#ifndef __LIPS_C_COMPILER_H__
+#define __LIPS_C_COMPILER_H__
+
+#include <lips/bytecode.h>
+#include <lips/ast.h>
+#include <notstd/utf8.h>
+
+typedef struct lcclabel{
+	long      address;
+	unsigned* resolve;
+}lcclabel_s;
+
+typedef struct lccrange{
+	uint16_t map[16];
+}lccrange_s;
+
+typedef struct lccurange{
+	uint16_t map[16];
+	uint16_t uni[512];
+}lccurange_s;
+
+typedef struct lccfn{
+	unsigned addr;
+	char*    name;
+	unsigned fail;
+}lccfn_s;
+
+typedef enum {
+	LCC_ERR_OK,
+	LCC_ERR_ERR_MANY,
+	LCC_ERR_RANGE_MANY,
+	LCC_ERR_JMP_LONG,
+	LCC_ERR_LBL_UNDECLARED,
+	LCC_ERR_LBL_LONG,
+	LCC_ERR_FN_REDEFINITION,
+	LCC_ERR_FN_LONG,
+	LCC_ERR_FN_MANY,
+	LCC_ERR_FN_NOTEXISTS,
+	LCC_ERR_FN_UNDECLARED
+}lccerr_e;
+
+typedef struct lcc{
+	uint16_t*    bytecode;
+	lccfn_s*     fn;
+	lccfn_s*     call;
+	lcclabel_s*  label;
+	lccrange_s*  range;
+	lccurange_s* urange;
+	char**       errstr;
+	unsigned     currentFN;
+	lccerr_e     err;
+	long         errid;
+	long         erraddr;
+}lcc_s;
+
+
+lcc_s* lcc_ctor(lcc_s* rc);
+void lcc_dtor(lcc_s* rc);
+lcc_s* lcc_match(lcc_s* rc);
+lcc_s* lcc_char(lcc_s* rc, uint8_t val);
+lcc_s* lcc_utf8(lcc_s* rc, const utf8_t* val);
+lccrange_s* lcc_range_ctor(lccrange_s* range);
+lccrange_s* lcc_range_set(lccrange_s* range, uint8_t ch);
+lccrange_s* lcc_range_clr(lccrange_s* range, uint8_t ch);
+lccrange_s* lcc_range_reverse(lccrange_s* range);
+lccrange_s* lcc_range_str_set(lccrange_s* range, const char* accept, unsigned rev);
+long lcc_range_add(lcc_s* rec, lccrange_s* range);
+unsigned lcc_label_new(lcc_s* rc);
+unsigned lcc_label(lcc_s* rc, unsigned lbl);
+lcc_s* lcc_split(lcc_s* rc, unsigned lbl);
+lcc_s* lcc_splir(lcc_s* rc, unsigned lbl);
+lcc_s* lcc_jmp(lcc_s* rc, unsigned lbl);
+lcc_s* lcc_save(lcc_s* rc, uint8_t id);
+lcc_s* lcc_node(lcc_s* rc, uint16_t id);
+lcc_s* lcc_nodeex(lcc_s* rc, nodeOP_e nop);
+long lcc_fn(lcc_s* rc, const char* name, unsigned len);
+lcc_s* lcc_ret(lcc_s* rc);
+int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store);
+int lcc_fn_epilog(lcc_s* rc, unsigned stored);
+int lcc_calli(lcc_s* rc, unsigned ifn);
+lcc_s* lcc_call(lcc_s* rc, const char* name, unsigned len);
+long lcc_error_add(lcc_s* rc, const char* str, unsigned len);
+lcc_s* lcc_error(lcc_s* rc, uint8_t num);
+lcc_s* lcc_start(lcc_s* rc, int search);
+uint16_t* lcc_make(lcc_s* rc);
+const char* lcc_err_str(lcc_s* lc, char info[4096]);
+void lcc_err_die(lcc_s* lc);
+
+
+#define CTOR()      lcc_s _lccobj; lcc_ctor(&_lccobj)
+#define INIT(R)     lcc_s* _lcc = (R)
+#define ROBJ()      (&_lccobj)
+#define DTOR()      do{ lcc_dtor(_lcc); }while(0)
+#define MATCH()     do{ lcc_match(_lcc); }while(0)
+#define CHAR(CH)    do{ lcc_char(_lcc, CH); }while(0)
+#define UNI(UTF8)   do{ lcc_utf8(_lcc, UTF8); }while(0)
+#define USERANGE(R) lccrange_s _tmprange; lcc_range_ctor(&_tmprange)
+#define RRANGE()    do{ lcc_range_ctor(&_tmprange); }while(0)
+#define RRSET(CH)   do{ lcc_range_set(&_tmprange, CH); }while(0)
+#define RRREV(CH)   do{ lcc_range_reverse(&_tmprange); }while(0)
+#define RRSTR(S,R)  do{ lcc_range_str_set(&_tmprange, S, R);}while(0)
+#define RRADD()     ({ long r = lcc_range_add(_lcc, &_tmprange); if( r < 0 ) lcc_err_die(_lcc); r})
+#define RANGE(ID)   do{ lcc_range(_lcc, ID); }while(0)
+#define USELBL(N)   unsigned L[N]; for( unsigned i = 0; i < N; ++i ) L[i] = lcc_label_new(_lcc)
+#define LABEL(LBL)  do{ lcc_label(_lcc, LBL);}while(0)
+#define LABDA()     lcc_label_new(_lcc)
+#define SPLIT(LBL)  do{ lcc_split(_lcc, LBL); }while(0)
+#define SPLIR(LBL)  do{ lcc_splir(_lcc, LBL); }while(0)
+#define JMP(LBL)    do{ lcc_jmp(_lcc, LBL); }while(0)
+#define SAVE(ID)    do{ lcc_save(_lcc, ID); }while(0)
+#define NODE(ID)    do{ lcc_node(_lcc, ID); }while(0)
+#define PARENT()    do{ lcc_nodeex(_lcc, NOP_PARENT); }while(0)
+#define NDISABLE()  do{ lcc_nodeex(_lcc, NOP_DISABLE); }while(0)
+#define NENABLE()   do{ lcc_nodeex(_lcc, NOP_ENABLE); }while(0)
+#define FN(N, STRE) for( int _tmp = lcc_fn_prolog(_lcc, N, strlen(N), STRE); _tmp; _tmp = lcc_fn_epilog(_lcc, STRE) )
+#define CALLI(ID)   do{ lcc_calli(_lcc, ID); }while(0)
+#define CALL(N)     do{ lcc_call(_lcc, N, strlen(N)); }while(0)
+#define RET(ID)     do{ lcc_ret(_lcc); }while(0)
+#define ERRADD(S)   ({ long r = lcc_error_add(_lcc, S); if( r < 0 ) lcc_err_die(_lcc); r})
+#define ERROR(N)    do{ lcc_error(_lcc, N); } while(0)
+#define START(INC)  do{ lcc_start(_lcc, INC); }while(0)
+#define MAKE()      lcc_make(_lcc)
+
+
+
+
+
+
+
+
+
+
+
+#endif

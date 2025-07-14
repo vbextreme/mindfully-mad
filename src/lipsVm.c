@@ -108,6 +108,7 @@ __private void op_node(lipsVM_s* vm, nodeOP_e op, unsigned id){
 }
 
 int lips_vm_exec(lipsVM_s* vm){
+	if( !stk_pop(vm) ) return 0;
 	const unsigned byc = vm->byc->code[vm->pc];
 	switch( BYTECODE_CMD40(byc) ){
 		case OP_MATCH:
@@ -195,7 +196,7 @@ int lips_vm_exec(lipsVM_s* vm){
 }
 
 int lips_vm_match(lipsVM_s* vm){
-	while( stk_pop(vm) && lips_vm_exec(vm) );
+	while( lips_vm_exec(vm) );
 	return vm->match->count;
 }
 
