@@ -56,5 +56,6 @@ termMultiSurface_s* term_multi_surface_apply(termMultiSurface_s* m);
 termMultiSurface_s* term_multi_surface_draw(termMultiSurface_s* m);
 void term_surface_clear(termSurface_s* s);
 void term_surface_focus(termSurface_s* s);
+void term_flush(void);
 
 #endif

@@ -182,6 +182,7 @@ long lcc_fn(lcc_s* rc, const char* name, unsigned len){
 	__free char* tmpname = str_dup(name, len);
 	mforeach(rc->fn, i){
 		if( !strcmp(rc->fn[i].name, tmpname) ){
+			dbg_error("redefinition function %s", tmpname);
 			rc->err   = LCC_ERR_FN_REDEFINITION;
 			rc->errid = i;
 			return -1;
@@ -196,6 +197,7 @@ long lcc_fn(lcc_s* rc, const char* name, unsigned len){
 	dbg_info("fn[%u] '%s'", ret, tmpname);
 	unsigned addr =  m_header(rc->bytecode)->len;
 	if( addr > UINT16_MAX ){
+		dbg_error("address to long");
 		rc->err     = LCC_ERR_FN_LONG;
 		rc->errid   = ret;
 		rc->erraddr = addr;
@@ -401,6 +403,7 @@ uint16_t* lcc_make(lcc_s* rc){
 	mforeach(rc->call, it){
 		long ifn = name_to_ifn(rc, rc->call[it].name);
 		if( ifn == -1 ){
+			dbg_info("not found function '%s'", rc->call[it].name);
 			rc->err     = LCC_ERR_FN_UNDECLARED;
 			rc->errid   = it;
 			rc->erraddr = 0;
@@ -436,8 +439,7 @@ const char* lcc_err_str(lcc_s* lc, char info[4096]){
 
 void lcc_err_die(lcc_s* lc){
 	if( !lc->err ) return;
-	char tmp[4096];
-	
+	char tmp[4096];	
 	die("lcc error(%u): %s", 
 		lc->err,
 		lcc_err_str(lc, tmp)

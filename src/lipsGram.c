@@ -434,7 +434,7 @@ __private void def_rule_group(lcc_s* lc){
 		CALL("skip");
 		CALL("rule_altern");
 		CALL("skip");
-		CALL(")");
+		CHAR(')');
 	}
 }
 

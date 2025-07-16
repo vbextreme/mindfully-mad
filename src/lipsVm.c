@@ -107,6 +107,7 @@ __private void stk_return_call_fail(lipsVM_s* vm, unsigned pos){
 }
 
 lipsVM_s* lips_vm_ctor(lipsVM_s* vm, lipsByc_s* byc){
+	dbg_info("");
 	vm->byc      = byc;
 	vm->stack    = MANY(lipsStack_s, vm->byc->codeLen);
 	vm->cstk     = MANY(unsigned, 128);
@@ -115,12 +116,14 @@ lipsVM_s* lips_vm_ctor(lipsVM_s* vm, lipsByc_s* byc){
 }
 
 void lips_vm_dtor(lipsVM_s* vm){
+	dbg_info("");
 	m_free(vm->stack);
 	m_free(vm->cstk);
 	m_free(vm->node);
 }
 
 void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt){
+	dbg_info("");
 	m_clear(vm->stack);
 	m_clear(vm->cstk);
 	m_clear(vm->node);

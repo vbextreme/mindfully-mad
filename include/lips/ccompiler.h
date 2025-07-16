@@ -150,16 +150,16 @@ void lcc_err_die(lcc_s* lc);
 
 #define CHOOSE_BEGIN(N) do{\
 	unsigned _incor = 1;\
-	USENELBL(_chooise, N);\
-	SPLIT(_chooise[_incor])
+	USENELBL(_choose, N);\
+	SPLIT(_choose[_incor])
 
 #define CHOOSE() do{\
-	JMP(_chooise[0]);\
-	LABEL(_incor);\
+	JMP(_choose[0]);\
+	LABEL(_choose[_incor]);\
 	++_incor;\
 }while(0)
 
-#define CHOOSE_END() LABEL(_chooise[0]);\
+#define CHOOSE_END() LABEL(_choose[0]);\
 }while(0)
 
 //?

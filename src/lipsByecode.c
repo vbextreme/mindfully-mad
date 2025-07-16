@@ -13,8 +13,12 @@ __private const char** map_name(const uint16_t* section, const unsigned count){
 }
 
 lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode){
+	dbg_info("");
 	byc->format = bytecode[BYC_FORMAT];
-	if( byc->format != BYTECODE_FORMAT ) return NULL;
+	if( byc->format != BYTECODE_FORMAT ){
+		dbg_error("wrong bytecode format");
+		return NULL;
+	}
 	byc->bytecode      = bytecode;
 	byc->flags         = bytecode[BYC_FLAGS];
 	byc->rangeCount    = bytecode[BYC_RANGE_COUNT];

@@ -172,6 +172,7 @@ void term_cline(unsigned len){
 }
 
 termMultiSurface_s* term_multi_surface_ctor(termMultiSurface_s* m, unsigned x, unsigned y,  unsigned sw){
+	dbg_info("%u %u %u", x, y, sw);
 	m->line = MANY(termSurfaceLine_s, 1);
 	m->w = sw;
 	m->x = x;
@@ -180,6 +181,7 @@ termMultiSurface_s* term_multi_surface_ctor(termMultiSurface_s* m, unsigned x, u
 }
 
 termMultiSurface_s* term_multi_surface_vsplit(termMultiSurface_s* m, unsigned h){
+	dbg_info("h:%u", h);
 	const unsigned i = m_ipush(&m->line);
 	m->line[i].h = h;
 	m->line[i].surface = MANY(termSurface_s, 1);
@@ -187,7 +189,8 @@ termMultiSurface_s* term_multi_surface_vsplit(termMultiSurface_s* m, unsigned h)
 }
 
 termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, unsigned w){
-	const unsigned c = m_header(m->line)->count - 1;
+	const unsigned c = m_header(m->line)->len - 1;
+	dbg_info("w:%u", w);
 	const unsigned i = m_ipush(&m->line[c].surface);
 	m->line[c].surface[i].w = w;
 	return m;
@@ -196,8 +199,9 @@ termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, unsigned w)
 __private unsigned tms_wsize(termSurface_s* s){
 	unsigned w = 0;
 	mforeach(s, i){
-		w += s->w;
+		w += s[i].w;
 	}
+	dbg_info("%u", w);
 	return w;
 }
 
@@ -207,27 +211,28 @@ __private unsigned tms_wmax(termMultiSurface_s* m){
 		const unsigned w = tms_wsize(m->line[il].surface);
 		if( w > max ) max = w;
 	}
+	dbg_info("%u", max);
 	return max;
 }
 
 __private unsigned tms_hsize(termSurfaceLine_s* l){
 	unsigned h = 0;
 	mforeach(l, i){
-		h += l->h;
+		h += l[i].h;
 	}
+	dbg_info("%u", h);
 	return h;
 }
 
 __private void mapset_clr(int8_t* map, unsigned maxw, unsigned x, unsigned y, unsigned w, unsigned h){
-	++y;
-	++x;
-	unsigned l = y*(maxw+2);
+	dbg_info("max:%u x:%u y:%u w:%u h:%u", maxw,x,y,w,h);
+	unsigned l = y*maxw;
 	for( unsigned i = x; i < x+w; ++i ) map[l+i] = 0;
-	l = (y+h-1)*(maxw*2);
+	l = (y+h-1)*maxw;
 	for( unsigned i = x; i < x+w; ++i ) map[l+i] = 0;
-	for( unsigned i = y; i < i+h-1; ++i ){
-		map[i*(maxw*2)+x]     = 0;
-		map[i*(maxw+2)+x+w-1] = 0;
+	for( unsigned i = y; i < y+h; ++i ){
+		map[i*maxw+x]     = 0;
+		map[i*maxw+x+w-1] = 0;
 	}
 }
 
@@ -243,8 +248,8 @@ __private unsigned mapmoore(int8_t* map, unsigned x, unsigned y, unsigned w){
 		[M_D] = 9,
 		[M_L] = 10,
 		[M_R] = 10,
-		[M_U | M_D] = 10,
-		[M_L | M_R] = 11,
+		[M_U | M_D] = 9,
+		[M_L | M_R] = 10,
 		[M_D | M_R] = 0,
 		[M_D | M_L | M_R] = 1,
 		[M_D | M_L] = 2,
@@ -264,8 +269,7 @@ __private unsigned mapmoore(int8_t* map, unsigned x, unsigned y, unsigned w){
 }
 
 __private void mapset_apply(int8_t* map, unsigned w, unsigned h){
-	h+=2;
-	w+=2;
+	dbg_info("");
 	for( unsigned iy = 1; iy < h-1; ++iy ){
 		const unsigned l = iy * w;
 		for( unsigned ix = 1; ix < w-1; ++ix ){
@@ -276,41 +280,44 @@ __private void mapset_apply(int8_t* map, unsigned w, unsigned h){
 }
 
 termMultiSurface_s* term_multi_surface_apply(termMultiSurface_s* m){
+	dbg_info("");
 	unsigned x = m->x;
 	unsigned y = m->y;
-	m->wmax    = tms_wmax(m);
-	m->hmax    = tms_hsize(m->line);
-	m->map     = MANY(int8_t, (m->wmax+2)*(m->hmax+2));
-	m_header(m->map)->len = (m->wmax+2) * (m->hmax+2);
-	for( unsigned i = 0; i < (m->wmax+2) * (m->hmax+2); ++i ){
+	m->wmax    = tms_wmax(m)+2;
+	m->hmax    = tms_hsize(m->line)+2;
+	dbg_info("map %u*%u = %u", m->wmax, m->hmax, m->wmax * m->hmax);
+	m->map     = MANY(int8_t, m->wmax*m->hmax);
+	m_header(m->map)->len = m->wmax * m->hmax;
+	for( unsigned i = 0; i < m->wmax * m->hmax; ++i ){
 		m->map[i] = -1;
 	}
-	
 	mforeach(m->line, il){
 		termSurfaceLine_s* sl = &m->line[il];
 		mforeach(sl->surface, is){
 			sl->surface[is].h = sl->h;
 			sl->surface[is].y = y;
 			sl->surface[is].x = x;
-			mapset_clr(m->map, m->wmax, x-m->x, y-m->y, sl->surface[is].w, sl->h);
+			mapset_clr(m->map, m->wmax, (x-m->x)+1, (y-m->y)+1, sl->surface[is].w, sl->h);
 			x += sl->surface[is].w-1;
 		}
-		y += sl->h -1;
+		x = 0;
+		y += sl->h-1;
 	}
-	
 	mapset_apply(m->map, m->wmax, m->hmax);
+	//dump_map(m);
 	return m;
 }
 
 termMultiSurface_s* term_multi_surface_draw(termMultiSurface_s* m){
 	unsigned x = m->x;
 	unsigned y = m->y;
-	for(unsigned iy = 1; iy < m->hmax+1; ++iy){
-		unsigned l = iy * (m->wmax+2);
+	for(unsigned iy = 1; iy < m->hmax-2; ++iy){
+		unsigned l = iy * m->wmax;
 		term_gotoxy(x,y);
-		for(unsigned ix = 1; ix < m->wmax+1; ++ix){
-			if( m->map[l+x] == -1 ) putchar(' ');
-			else term_box(m->map[l+x]);
+		for(unsigned ix = 1; ix < m->wmax-1; ++ix){
+			const int8_t ch = m->map[l+ix];
+			if( ch == -1 ) putchar(' ');
+			else term_box(ch);
 		}
 		++y;
 	}
@@ -328,7 +335,9 @@ void term_surface_focus(termSurface_s* s){
 	term_gotoxy(s->x+1, s->y+1);
 }
 
-
+void term_flush(void){
+	fflush(stdout);
+}
 
 
 

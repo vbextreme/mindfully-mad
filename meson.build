@@ -67,7 +67,6 @@ src += [ 'src/lipsAst.c' ]
 src += [ 'src/lipsVm.c' ]
 src += [ 'src/lipsDebug.c' ]
 src += [ 'src/lipsCcompiler.c' ]
-src += [ 'src/lipsAsmGram.c' ]
 src += [ 'src/lipsGram.c' ]
 src += [ 'src/mbi.c' ]
 

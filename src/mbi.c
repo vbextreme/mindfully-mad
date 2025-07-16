@@ -53,7 +53,6 @@ int main(int argc, char** argv){
 		argv_usage(opt, argv[0]);
 		return 0;
 	}
-	if( !opt[OPT_g].set ) die("required argument --grammar");
 	if( !opt[OPT_s].set ) die("required argument --source");
 	
 	if( opt[OPT_dump_capture].set && m_header(opt[OPT_dump_capture].value)->len != m_header(opt[OPT_s].value)->len ){
@@ -67,18 +66,34 @@ int main(int argc, char** argv){
 	}
 	
 	uint16_t* lgram = lips_builtin_grammar_make();
+	if( !lgram ) die("internal error, wrong builtin lips grammar");
 	lipsByc_s lbyc;
 	lipsByc_ctor(&lbyc, lgram);
 	lipsVM_s vm;
 	lips_vm_ctor(&vm, &lbyc);
 	
+	if( opt[OPT_g].set ){
+		lipsMatch_s m;
+		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_g].value->str);
+		lips_vm_reset(&vm, &m, source);
+		if( lips_vm_match(&vm) < 1 ){
+			lips_dump_error(&m, source, stderr);
+			die("");
+		}
+		die("TODO extract new grammar");
+		lipsByc_dtor(&lbyc);
+		lips_vm_dtor(&vm);
+		lipsByc_ctor(&lbyc, lgram);
+		lips_vm_ctor(&vm, &lbyc);
+	}
+
 	mforeach(opt[OPT_s].value, it){
 		lipsMatch_s m;
 		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_s].value[it].str);
 		lips_vm_reset(&vm, &m, source);
 		
 		if( opt[OPT_d].set ){
-			//lips_debug(grambyc, source, &m);
+			lips_vm_debug(&vm);
 		}
 		else{
 			if( lips_vm_match(&vm) < 1 ){
@@ -86,6 +101,7 @@ int main(int argc, char** argv){
 				die("");
 			}
 		}
+		die("");
 		if( opt[OPT_dump_capture].set ){
 			FILE* out = argfopen(opt[OPT_dump_capture].value[it].str, "w");
 			//lips_dump_capture(&m, out);
