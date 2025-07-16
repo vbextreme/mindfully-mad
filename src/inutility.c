@@ -117,5 +117,139 @@ const char* cast_view_char(unsigned ch, int convertnumerical){
 	return tmp;
 }
 
+void term_cls(void){
+	fputs("\033[2J\033[H", stdout);
+}
+
+void term_gotoxy(unsigned x, unsigned y){
+	printf("\033[%d;%dH", y+1, x+1);
+}
+
+void term_nexty(unsigned y){
+	printf("\033[%dB", y);
+}
+
+void term_prevx(unsigned x){
+	printf("\033[%dD", x);
+}
+
+void term_fcol(unsigned col){
+	printf("\033[38;5;%um", col);
+}
+
+void term_bcol(unsigned col){
+	printf("\033[48;5;%um", col);
+}
+
+void term_reset(void){
+	printf("\033[m");
+}
+
+void term_bold(void){
+	printf("\033[1m");
+}
+
+void term_box(unsigned i){
+	//                            0    1    2    3    4    5    6    7    8
+	static const char* box[] = { "┌", "┬", "┐", "┤", "┘", "┴", "└", "├", "┼"};
+	fputs(box[i], stdout);
+}
+
+void term_hline(unsigned len){
+	while( len --> 0 ) fputs("─", stdout);
+}
+
+void term_vline(unsigned len){
+	while( len --> 0 ){
+		fputs("│", stdout);
+		term_nexty(1);
+		term_prevx(1);
+	}
+}
+
+void term_cline(unsigned len){
+	while( len --> 0 ) putchar(' ');
+}
+
+termMultiSurface_s* term_multi_surface_ctor(termMultiSurface_s* m, unsigned x, unsigned y,  unsigned sw){
+	m->line = MANY(termSurfaceLine_s, 1);
+	m->w = sw;
+	m->x = x;
+	m->y = y;
+	return m;
+}
+
+termMultiSurface_s* term_multi_surface_vsplit(termMultiSurface_s* m, unsigned h){
+	const unsigned i = m_ipush(&m->line);
+	m->line[i].h = h;
+	m->line[i].surface = MANY(termSurface_s, 1);
+	return m;
+}
+
+termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, unsigned w){
+	const unsigned c = m_header(m->line)->count - 1;
+	const unsigned i = m_ipush(&m->line[c].surface);
+	m->line[c].surface[i].w = w;
+	return m;
+}
+
+__private unsigned tms_wsize(termSurface_s* s, unsigned* nu){
+	unsigned w = 0;
+	*nu = 0;
+	mforeach(s, i){
+		if( s->w ){
+			++(*nu);
+			w += s->w;
+		}
+	}
+	return w;
+}
+
+termMultiSurface_s* term_multi_surface_apply(termMultiSurface_s* m){
+	unsigned x = m->x;
+	unsigned y = m->y;
+	mforeach(m->line, il){
+		termSurfaceLine_s* sl = &m->line[il];
+		unsigned       nu;
+		const unsigned wc = m_header(sl)->len;
+		const unsigned dw = tms_wsize(sl->surface, &nu);
+		const unsigned ws = (m->w - dw) / (wc-nu);
+		mforeach(sl->surface, is){
+			sl->surface[is].h = sl->h;
+			if( !sl->surface[is].w ) sl->surface[is].w = ws;
+			sl->surface[is].y = y;
+			sl->surface[is].x = x;
+			x += sl->surface[is].w-1;
+		}
+		y += sl->h -1;
+	}
+	return m;
+}
+
+termMultiSurface_s* term_multi_surface_draw(termMultiSurface_s* m){
+	unsigned x = m->x;
+	unsigned y = m->y;
+	const unsigned lc = m_header(m->line)->len;
+	for(unsigned il = 0; il < lc; ++il){
+		termSurfaceLine_s* sl = &m->line[il];
+		const unsigned sc = m_header(sl->surface)->len;
+		for(unsigned is = 0; is < sc; ++is){
+			
+			x += sl->surface[is].w-1;
+		}
+		y += sl->h -1;
+	}
+	return m;
+}
+
+
+
+
+
+
+
+
+
+
 
 

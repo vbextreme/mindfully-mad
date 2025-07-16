@@ -1,9 +1,10 @@
-#include <mfm.h>
 #include <notstd/opt.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <mfmrevm.h>
 #include <inutility.h>
+#include <lips/vm.h>
+#include <lips/builtingram.h>
+#include <lips/bytecode.h>
+#include <lips/debug.h>
 
 //TODO
 //dbginput scorre male
@@ -12,25 +13,21 @@
 
 typedef enum{
 	OPT_g,
-	OPT_reasm_gram,
 	OPT_s,
 	OPT_d,
 	OPT_dump_capture,
 	OPT_dump_ast_file,
 	OPT_dump_ast_dot,
-	OPT_E,
 	OPT_h
 }options_e;
 
 option_s opt[] = {
 	{ 'g', "--grammar"      , "grammar file"                                           ,              OPT_PATH | OPT_EXISTS, 0, NULL},
-	{'\0', "--lipsasm-gram" , "use builtin lips asm grammar"                           ,                          OPT_NOARG, 0, NULL},
 	{ 's', "--source"       , "source file"                                            ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
 	{ 'd', "--debug"        , "debug"                                                  ,                          OPT_NOARG, 0, NULL},
 	{'\0', "--dump-capture" , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
 	{'\0', "--dump-ast-file", "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
 	{'\0', "--dump-ast-dot" , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
-	{ 'E', "--dump_error"   , "display error, file accept stdout/stderr"               ,                           OPT_PATH, 0, NULL},
 	{ 'h', "--help"         , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
 
@@ -51,29 +48,13 @@ __private void argfclose(FILE* f){
 }
 
 int main(int argc, char** argv){
-	__free uint16_t* grambyc = NULL;
-
 	argv_parse(opt, argc, argv);
 	if( opt[OPT_h].set ){
 		argv_usage(opt, argv[0]);
 		return 0;
 	}
-	if( !opt[OPT_g].set ){
-		if( opt[OPT_reasm_gram].set ){
-			grambyc = reasmgram_make();
-		}
-		else{
-			die("required argument --grammar");
-		}
-	}
-	else{
-		//TODO make grammar
-	}
-	if( !opt[OPT_s].set )die("required argument --source");
-	
-	//mfm_s mfm;
-	//mfm_s_ctor(&mfm);
-	//mfm_load_grammar(&mfm, opt[OPT_g].value->str);
+	if( !opt[OPT_g].set ) die("required argument --grammar");
+	if( !opt[OPT_s].set ) die("required argument --source");
 	
 	if( opt[OPT_dump_capture].set && m_header(opt[OPT_dump_capture].value)->len != m_header(opt[OPT_s].value)->len ){
 		die("for dump capture need pass many file same many source have passed, for example -s A,B --dump-caputre stdout,stdout");
@@ -84,52 +65,46 @@ int main(int argc, char** argv){
 	if( opt[OPT_dump_ast_dot].set && m_header(opt[OPT_dump_ast_dot].value)->len != m_header(opt[OPT_s].value)->len ){
 		die("for dump ast need pass many file same many source have passed, for example -s A,B --dump-ast-dot cA,cB");
 	}
-
+	
+	uint16_t* lgram = lips_builtin_grammar_make();
+	lipsByc_s lbyc;
+	lipsByc_ctor(&lbyc, lgram);
+	lipsVM_s vm;
+	lips_vm_ctor(&vm, &lbyc);
+	
 	mforeach(opt[OPT_s].value, it){
 		lipsMatch_s m;
 		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_s].value[it].str);
-	//	mfm_clear(&mfm);
-	//	printf("<%s>\n", opt[OPT_s].value[it].str);
-	//	mfm_lexer_file(&mfm, opt[OPT_s].value[it].str);
-	//	if( opt[OPT_dump_token].set ) mfm_token_dump(&mfm);
+		lips_vm_reset(&vm, &m, source);
+		
 		if( opt[OPT_d].set ){
-			lips_debug(grambyc, source, &m);
+			//lips_debug(grambyc, source, &m);
 		}
 		else{
-			lips_match(grambyc, source, &m);
+			if( lips_vm_match(&vm) < 1 ){
+				lips_dump_error(&m, source, stderr);
+				die("");
+			}
 		}
 		if( opt[OPT_dump_capture].set ){
 			FILE* out = argfopen(opt[OPT_dump_capture].value[it].str, "w");
-			lips_dump_capture(&m, out);
+			//lips_dump_capture(&m, out);
 			argfclose(out);
 		}
 		if( opt[OPT_dump_ast_file].set ){
 			FILE* out = argfopen(opt[OPT_dump_ast_file].value[it].str, "w");
-			lips_dump_ast(&m, grambyc, out, 1, 0);
+			//lips_dump_ast(&m, grambyc, out, 1, 0);
 			argfclose(out);
 		}
 		if( opt[OPT_dump_ast_dot].set ){
 			FILE* out = argfopen(opt[OPT_dump_ast_dot].value[it].str, "w");
-			lips_dump_ast(&m, grambyc, out, 0, 1);
-			argfclose(out);
-		}
-		if( opt[OPT_E].set ){
-			FILE* out = argfopen(opt[OPT_E].value[it].str, "w");
-			lips_dump_error(&m, source, out);
+			//lips_dump_ast(&m, grambyc, out, 0, 1);
 			argfclose(out);
 		}
 	}
-	//mfm_s_dtor(&mfm);
+	
+	lips_vm_dtor(&vm);
+	lipsByc_dtor(&lbyc);
+	return 0;
 }
-/*
 
-fn.dot: node new
-	char '.'
-	node parent
-	ret
-
-fn.float: call num
-	call dot
-	call num
-	ret
-*/

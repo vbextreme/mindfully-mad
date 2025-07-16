@@ -1,5 +1,78 @@
 #include <lips/vm.h>
 
+/*
+char   ch   ; if *str == ch
+range  id   ; check range id
+urange id   ; check range fo unicode
+split  label; continue to pc+1 and start thread label
+splir  label; continue to label and start thread pc+1
+jmp    label; set pc to label
+save   id   ; capture with id as name of capture
+call   label; call function label
+ret        ; return from call
+node   id   ; create node with id
+token  id   ; last save is token id
+
+/e/
+    char  e
+
+/[a-z]/
+    range 0
+
+/e1|e2/
+    split L1
+    #code e1
+    jmp   L2
+L1: #code E2
+L2: #continue
+
+#greedy
+/e?/
+    split L2
+    #code E
+L2: #code after e
+
+#non greedy
+/e? ?/
+    splir L2
+    #code E
+L2: #code after e
+
+/e* /
+L1: split L2
+    #code e
+    jmp L1
+L2: #continue after e
+
+/e*?/
+L1: splir L2
+    #code e
+    jmp L1
+L2: #continue after e
+
+/e+/
+L1: #code e
+    splir L1
+    #continue after e
+
+/e+?/
+L1: #code e
+    split L1
+    #continue after e
+
+
+how call work:
+FN: SPLIT CF
+	CHAR a
+    char b
+	RET 0
+CF: RET -1
+
+CALL FN; push pc+1
+       ; push pc[FN]
+MATCH
+*/
+
 __private void stk_push(lipsVM_s* vm, unsigned pc, const utf8_t* sp){
 	unsigned i = m_ipush(&vm->stack);
 	vm->stack[i].pc = pc;

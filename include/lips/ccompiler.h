@@ -65,6 +65,7 @@ lccrange_s* lcc_range_clr(lccrange_s* range, uint8_t ch);
 lccrange_s* lcc_range_reverse(lccrange_s* range);
 lccrange_s* lcc_range_str_set(lccrange_s* range, const char* accept, unsigned rev);
 long lcc_range_add(lcc_s* rec, lccrange_s* range);
+lcc_s* lcc_range(lcc_s* rc, uint16_t val);
 unsigned lcc_label_new(lcc_s* rc);
 unsigned lcc_label(lcc_s* rc, unsigned lbl);
 lcc_s* lcc_split(lcc_s* rc, unsigned lbl);
@@ -99,9 +100,11 @@ void lcc_err_die(lcc_s* lc);
 #define RRSET(CH)   do{ lcc_range_set(&_tmprange, CH); }while(0)
 #define RRREV(CH)   do{ lcc_range_reverse(&_tmprange); }while(0)
 #define RRSTR(S,R)  do{ lcc_range_str_set(&_tmprange, S, R);}while(0)
-#define RRADD()     ({ long r = lcc_range_add(_lcc, &_tmprange); if( r < 0 ) lcc_err_die(_lcc); r})
+#define RRADD()     ({ long r = lcc_range_add(_lcc, &_tmprange); if( r < 0 ) lcc_err_die(_lcc); r; })
 #define RANGE(ID)   do{ lcc_range(_lcc, ID); }while(0)
-#define USELBL(N)   unsigned L[N]; for( unsigned i = 0; i < N; ++i ) L[i] = lcc_label_new(_lcc)
+#define ANY()       RANGE(0)
+#define USENELBL(NAME,N) unsigned NAME[N]; for( unsigned i = 0; i < N; ++i ) NAME[i] = lcc_label_new(_lcc)
+#define USELBL(N)   USENELBL(L, N)
 #define LABEL(LBL)  do{ lcc_label(_lcc, LBL);}while(0)
 #define LABDA()     lcc_label_new(_lcc)
 #define SPLIT(LBL)  do{ lcc_split(_lcc, LBL); }while(0)
@@ -116,16 +119,74 @@ void lcc_err_die(lcc_s* lc);
 #define CALLI(ID)   do{ lcc_calli(_lcc, ID); }while(0)
 #define CALL(N)     do{ lcc_call(_lcc, N, strlen(N)); }while(0)
 #define RET(ID)     do{ lcc_ret(_lcc); }while(0)
-#define ERRADD(S)   ({ long r = lcc_error_add(_lcc, S); if( r < 0 ) lcc_err_die(_lcc); r})
+#define ERRADD(S)   ({ long r = lcc_error_add(_lcc, S, strlen(S)); if( r < 0 ) lcc_err_die(_lcc); r;})
 #define ERROR(N)    do{ lcc_error(_lcc, N); } while(0)
 #define START(INC)  do{ lcc_start(_lcc, INC); }while(0)
-#define MAKE()      lcc_make(_lcc)
+#define MAKE(SET)   do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
 
+#define OR2(CMDSA, CMDSB) do{\
+	USENELBL(LNOR,2);\
+	SPLIT(LNOR[1]);\
+	CMDSA\
+	JMP(LNOR[0]);\
+	LABEL(LNOR[1]);\
+	CMDSB\
+	LABEL(LNOR[0]);\
+}while(0)
 
+#define OR3(CMDSA, CMDSB, CMDSC) do{\
+	USENELBL(LNOR,3);\
+	SPLIT(LNOR[1]);\
+	CMDSA\
+	JMP(LNOR[0]);\
+	LABEL(LNOR[1]);\
+	SPLIT(LNOR[2]);\
+	CMDSB\
+	JMP(LNOR[0]);\
+	LABEL(LNOR[2]);\
+	CMDSC\
+	LABEL(LNOR[0]);\
+}while(0)
 
+#define CHOOSE_BEGIN(N) do{\
+	unsigned _incor = 1;\
+	USENELBL(_chooise, N);\
+	SPLIT(_chooise[_incor])
 
+#define CHOOSE() do{\
+	JMP(_chooise[0]);\
+	LABEL(_incor);\
+	++_incor;\
+}while(0)
 
+#define CHOOSE_END() LABEL(_chooise[0]);\
+}while(0)
 
+//?
+#define ZOQ(CMD) do{\
+	USENELBL(LZ, 1);\
+	SPLIT(LZ[0]);\
+	CMD\
+	LABEL(LZ[0]);\
+}while(0)
+
+//*
+#define ZMQ(CMD) do{\
+	USENELBL(LZM, 2);\
+	LABEL(LZM[1]);\
+	SPLIT(LZM[0]);\
+	CMD\
+	JMP(LZM[1]);\
+	LABEL(LZM[0]);\
+}while(0)
+
+//+
+#define OMQ(CMD) do{\
+	USENELBL(LOM, 1);\
+	LABEL(LOM[0]);\
+	CMD\
+	SPLIR(LOM[0]);\
+}while(0)
 
 
 
