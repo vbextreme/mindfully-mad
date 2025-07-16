@@ -135,7 +135,7 @@ void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt){
 	vm->match->err.loc    = NULL;
 	vm->match->ast        = NULL;
 	vm->match->count      = -1;
-	stk_push(vm, vm->byc->start, vm->sp);
+	stk_push(vm, vm->byc->start, txt);
 }
 
 __private int op_range(lipsVM_s* vm, unsigned ir, utf8_t ch){
