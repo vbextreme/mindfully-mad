@@ -19,6 +19,9 @@ typedef struct termMultiSurface{
 	unsigned x;
 	unsigned y;
 	unsigned w;
+	unsigned hmax;
+	unsigned wmax;
+	int8_t*  map;
 	termSurfaceLine_s* line;
 }termMultiSurface_s;
 
@@ -46,6 +49,12 @@ void term_box(unsigned i);
 void term_hline(unsigned len);
 void term_vline(unsigned len);
 void term_cline(unsigned len);
-
+termMultiSurface_s* term_multi_surface_ctor(termMultiSurface_s* m, unsigned x, unsigned y,  unsigned sw);
+termMultiSurface_s* term_multi_surface_vsplit(termMultiSurface_s* m, unsigned h);
+termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, unsigned w);
+termMultiSurface_s* term_multi_surface_apply(termMultiSurface_s* m);
+termMultiSurface_s* term_multi_surface_draw(termMultiSurface_s* m);
+void term_surface_clear(termSurface_s* s);
+void term_surface_focus(termSurface_s* s);
 
 #endif
