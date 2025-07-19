@@ -23,7 +23,7 @@ rx_char    : rx_escaped
            | rx_literal
            ;
 rx_range   : rx_char (/-/ rx_char)?;
-rx_class   : /[/ rx_range+ /]/;
+rx_class   : /\[/ rx_range+ /\]/;
 
 rx_begin : /\^/;
 rx_end   : /\$/;
