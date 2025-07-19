@@ -364,6 +364,11 @@ __private void action_breakremove(lipsVMDebug_s* d){
 	breakpoint_rm(d, strtoul(d->cinp.argv[1], NULL, 16));
 }
 
+__private void action_refresh(lipsVMDebug_s* d){
+	term_multi_surface_draw(&d->tms);
+	draw_step(d);
+}
+
 cmdmap_s CMD[] = {{
 		.shr = "",
 		.lng = "",
@@ -399,7 +404,12 @@ cmdmap_s CMD[] = {{
 		.lng = "breakremove",
 		.act = action_breakremove,
 		.nam = 1
-	}
+	},{
+		.shr = "r",
+		.lng = "refresh",
+		.act = action_refresh,
+		.nam = 0
+	}	
 };
 
 __private void command_parse(lipsVMDebug_s* d){
