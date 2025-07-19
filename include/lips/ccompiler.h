@@ -148,16 +148,33 @@ void lcc_err_die(lcc_s* lc);
 	LABEL(LNOR[0]);\
 }while(0)
 
+//
+//     split l1
+// [1]    cmda
+//     jmp l0
+// l1: split l2
+// [2]    cmdb
+//     jmp l0
+// l2: [3] cmdc
+// l0:
+//
+
 #define CHOOSE_BEGIN(N) do{\
 	unsigned _incor = 1;\
-	USENELBL(_choose, N);\
+	unsigned const _maxcor = N;\
+	USENELBL(_choose, _maxcor);\
 	SPLIT(_choose[_incor])
 
 #define CHOOSE() do{\
-	JMP(_choose[0]);\
-	LABEL(_choose[_incor]);\
-	++_incor;\
-	SPLIT(_choose[_incor]);\
+	if( _incor < _maxcor-1 ){\
+		JMP(_choose[0]);\
+		LABEL(_choose[_incor++]);\
+		SPLIT(_choose[_incor]);\
+	}\
+	else{\
+		JMP(_choose[0]);\
+		LABEL(_choose[_incor]);\
+	}\
 }while(0)
 
 #define CHOOSE_END() LABEL(_choose[0]);\
