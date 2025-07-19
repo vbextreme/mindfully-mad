@@ -41,6 +41,7 @@ void lips_vm_dtor(lipsVM_s* vm);
 void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt);
 int lips_vm_exec(lipsVM_s* vm);
 int lips_vm_match(lipsVM_s* vm);
+int lips_range_test(lipsVM_s* vm, unsigned ir, utf8_t ch );
 
 #endif
 

@@ -325,7 +325,7 @@ termMultiSurface_s* term_multi_surface_draw(termMultiSurface_s* m){
 }
 
 void term_surface_clear(termSurface_s* s){
-	for( unsigned y = s->y + 1; y < s->h-2; ++y ){
+	for( unsigned y = s->y + 1; y < s->y+s->h-1; ++y ){
 		term_gotoxy(s->x+1, y);
 		term_cline(s->w-2);
 	}

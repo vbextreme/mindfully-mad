@@ -1,6 +1,6 @@
 #include <lips/ccompiler.h>
 
-/*
+/* dbg 14f -> 126 regex ->-> 90 rx_primary
 @error[1] 'unknown symbol at this state';
 
 num       : /[0-9]+/;
@@ -46,7 +46,7 @@ unstore   : /-/;
 match     : /@/;
 rulestart : /:/;
 word      : /[a-zA-Z_][a-zA-Z_0-9]* /;
-quoted    : /'(?:[^\\]|\\.)*'/;
+quoted    : /'(?:[^\\']|\\.)*'/;
 
 builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
 
@@ -75,7 +75,7 @@ grammar: regex
        | $[1]
        ;
 
-_start_: grammar;
+_start_: grammar+;
 
 */
 
@@ -365,11 +365,12 @@ __private void def_word(lcc_s* lc){
 	}
 }
 
-//quoted    : /'(?:[^\\]|\\.)*'/;
+//quoted    : /'(?:[^\\']|\\.)*'/;
 __private void def_quoted(lcc_s* lc){
 	INIT(lc);
 	USERANGE();
 	RRSET('\\');
+	RRSET('\'');
 	RRREV();
 	unsigned nbl = RRADD();
 	FN("quoted", 1){
@@ -559,7 +560,7 @@ __private void dec_error(lcc_s* lc){
 	ERRADD("unknown symbol at this state");
 }
 
-//_start_: grammar;
+//_start_: grammar+;
 uint16_t* lips_builtin_grammar_make(void){
 	CTOR();
 	INIT(ROBJ());
@@ -608,7 +609,7 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_grammar(ROBJ());
 	dec_error(ROBJ());
 	START(0);
-	CALL("grammar");
+	OMQ(CALL("grammar"););
 	uint16_t* ret;
 	MAKE(ret);
 	DTOR();

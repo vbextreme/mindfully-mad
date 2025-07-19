@@ -1,17 +1,56 @@
+#include <notstd/str.h>
 #include <lips/bytecode.h>
 #include <lips/debug.h>
 #include <inutility.h>
+#include <readline/readline.h>
+
+typedef enum { 
+	DBG_STATE_QUIT = -1,
+	DBG_STATE_STEP,
+	DBG_STATE_BREAK,
+	DBG_STATE_RUN
+}dbgState_e;
+
+typedef struct cmdInput{
+	char*  line;
+	char** argv;
+}cmdInput_s;
 
 typedef struct lipsVMDebug{
 	termMultiSurface_s tms;
 	lipsVM_s*          vm;
 	termSurface_s*     header;
 	termSurface_s*     stack;
+	termSurface_s*     cstack;
+	termSurface_s*     node;
+	termSurface_s*     save;
+	termSurface_s*     range;
+	termSurface_s*     input;
+	termSurface_s*     code;
+	termSurface_s*     prompt;
+	cmdInput_s         cinp;
+	unsigned           txtLen;
+	unsigned           curStack;
+	unsigned           curPC;
+	unsigned           stackLen;
+	uint32_t*          breakpoint;
+	unsigned           brrm;
+	dbgState_e         state;
 }lipsVMDebug_s;
 
+typedef void(*action_f)(lipsVMDebug_s* d);
+
+typedef struct cmdmap{
+	const char* shr;
+	const char* lng;
+	action_f    act;
+	unsigned    nam;
+}cmdmap_s;
+
+
+typedef void (*drawrevline_f)(lipsVMDebug_s* d, unsigned i);
 
 __private void d_create_surface(lipsVMDebug_s* d){
-	dbg_info("");
 	termMultiSurface_s* m = term_multi_surface_ctor(&d->tms, LIPS_DBG_X, LIPS_DBG_Y, LIPS_DBG_SCREEN_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_HEADER_H);
 	term_multi_surface_hsplit(m, LIPS_DBG_HEADER_W);
@@ -31,120 +70,72 @@ __private void d_create_surface(lipsVMDebug_s* d){
 	term_multi_surface_apply(m);
 	d->header = &m->line[0].surface[0];
 	d->stack  = &m->line[1].surface[0];
+	d->cstack = &m->line[1].surface[1];
+	d->node   = &m->line[1].surface[2];
+	d->save   = &m->line[1].surface[3];
+	d->range  = &m->line[2].surface[0];
+	d->code   = &m->line[3].surface[0];
+	d->prompt = &m->line[4].surface[0];
+	d->input  = &m->line[5].surface[0];
 }
 
-__private void draw_step(lipsVMDebug_s* d){
-	unsigned y,ny,count,sc;
-	//draw header
-	term_surface_clear(d->header);
-	term_surface_focus(d->header);
-	printf("start:%04X ranges:%u functions:%u stacksize:%u", d->vm->byc->start, d->vm->byc->rangeCount, d->vm->byc->fnCount, m_header(d->vm->stack)->len);
-	//draw stack
-	term_surface_clear(d->stack);
-	ny    = d->stack->h - 2;
-	y     = d->stack->y+ny;
-	count = m_header(d->vm->stack)->len;
-	sc = count > ny ? count - ny: 0;
-	while( ny-->0 && sc < count){
-		term_gotoxy(1,y--);
-		printf(" %% pc:%04X sp:%4lu ls:%3d",
-			d->vm->stack[sc].pc,
-			d->vm->stack[sc].sp-d->vm->txt,
-			d->vm->stack[sc].ls
-		);
-		++sc;
-	}
-
-}
-/*
-__private void draw_stack(lipsStack_s* base, const utf8_t* txt){
-	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
-	unsigned ny = DBG_STACKED_H;
-	unsigned count = m_header(base)->len;
+__private void reverse_draw(lipsVMDebug_s* d, termSurface_s* s, unsigned count, drawrevline_f fn){
+	term_surface_clear(s);
+	unsigned ny    = s->h - 2;
+	unsigned y     = s->y+ny;
 	unsigned sc = count > ny ? count - ny: 0;
-	draw_cls_rect(1, DBG_HEADER_H+2, DBG_STACK_W, DBG_STACKED_H);
 	while( ny-->0 && sc < count){
-		term_gotoxy(1,y--);
-		printf(" %% pc:%04X sp:%4lu ls:%3d",
-			base[sc].pc,
-			base[sc].sp-txt,
-			base[sc].ls
-		);
+		term_gotoxy(s->x+1,y--);
+		fn(d, sc);
 		++sc;
 	}
 }
 
-__private void draw_cstack(lips_s* vm){
-	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
-	unsigned ny = DBG_STACKED_H;
-	unsigned count = m_header(vm->cstk)->len;
-	unsigned sc = count > ny ? count - ny: 0;
-	unsigned x = DBG_STACK_W+2;
-	draw_cls_rect(x, DBG_HEADER_H+2, DBG_CSTACK_W, DBG_STACKED_H);
-	while( ny-->0 && sc < count){
-		term_gotoxy(x, y--);
-		printf(" <- pc:%4X", vm->cstk[sc]);
-		++sc;
+__private void revdraw_stack(lipsVMDebug_s* d, unsigned sc){
+	printf(" %% pc:%04X sp:%4lu ls:%3d",
+		d->vm->stack[sc].pc,
+		d->vm->stack[sc].sp-d->vm->txt,
+		d->vm->stack[sc].ls
+	);
+}
+
+__private void revdraw_cstack(lipsVMDebug_s* d, unsigned sc){
+	printf(" <- pc:%4X", d->vm->cstk[sc]);
+}
+
+__private void revdraw_node(lipsVMDebug_s* d, unsigned sc){
+	switch( d->vm->node[sc].op ){
+		case NOP_NEW    : printf(" + [%4u](%3d)%s len:%lu", sc, d->vm->node[sc].id, d->vm->byc->fnName[d->vm->node[sc].id], d->vm->node[sc].sp - d->vm->txt); break;
+		case NOP_PARENT : printf(" < [%4d] %lu", sc, d->vm->node[sc].sp - d->vm->txt); break;
+		case NOP_DISABLE: printf(" ~ [%4u]", sc); break;
+		case NOP_ENABLE : printf(" & [%4u]", sc); break;
+		default: printf(" INTERNAL ERROR ");
 	}
 }
 
-__private void draw_node(lips_s* vm, const char** nmap, const utf8_t* txt){
-	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
-	unsigned ny = DBG_STACKED_H;
-	unsigned count = m_header(vm->node)->len;
-	unsigned sc = count > ny ? count - ny: 0;
-	unsigned x = DBG_STACK_W+2+DBG_CSTACK_W+1;
-	draw_cls_rect(x, DBG_HEADER_H+2, DBG_NODE_W, DBG_STACKED_H);
-	while( ny-->0 && sc < count){
-		term_gotoxy(x, y--);
-		switch( vm->node[sc].op ){
-			case NOP_NEW    : printf(" + [%4u](%3d)%s %lu", sc, vm->node[sc].id, nmap[vm->node[sc].id], vm->node[sc].sp - txt); break;
-			case NOP_PARENT : printf(" < [%4d] %lu", sc, vm->node[sc].sp - txt); break;
-			case NOP_DISABLE: printf(" ~ [%4u]", sc); break;
-			case NOP_ENABLE : printf(" & [%4u]", sc); break;
-		}
-		++sc;
-	}
+__private void revdraw_save(lipsVMDebug_s* d, unsigned sc){
+	printf(" $(%3u) %ld", sc, d->vm->match->capture[sc] ? d->vm->match->capture[sc] - d->vm->txt : -1);
 }
 
-__private void draw_save(lips_s* vm, const utf8_t* txt){
-	unsigned y  = DBG_HEADER_H+1+DBG_STACKED_H;
-	unsigned ny = DBG_STACKED_H;
-	unsigned count = vm->ls+1;
-	unsigned sc = count > ny ? count - ny: 0;
-	unsigned x = DBG_STACK_W+2+DBG_CSTACK_W+1+DBG_NODE_W+1;
-	draw_cls_rect(x, DBG_HEADER_H+2, DBG_NODE_W, DBG_STACKED_H);
-	while( ny-->0 && sc < count){
-		term_gotoxy(x, y--);
-		printf(" $(%3u) %ld", sc, vm->save[sc] ? vm->save[sc] - txt : -1);
-		++sc;
-	}
-}
-
-__private void draw_range_clr(void){
-	draw_cls_rect(1, DBG_HEADER_H+2+DBG_STACKED_H+1, DBG_SCREEN_W, DBG_RANGE_H);
-}
-
-__private void draw_range(lips_s* vm, unsigned idrange, long ch){
+__private void draw_range(lipsVMDebug_s* d, unsigned idrange, long ch){
 	const unsigned cunset = 130;
 	const unsigned cerr   = 124;
 	const unsigned cset   = 22;
 	const unsigned cmatch = 17;
-	draw_range_clr();
-	term_gotoxy(1, DBG_HEADER_H+2+DBG_STACKED_H+1);
+	term_gotoxy(d->range->x+1, d->range->y+1);
 	printf("range:%4u ch:", idrange);
 	if( ch == -1 ){
 		term_bcol(cunset);
 	}
 	else{
-		term_bcol( range(vm, idrange, ch)? cmatch: cerr);
+		term_bcol( lips_range_test(d->vm, idrange, ch)? cmatch: cerr);
 	}
-	putc_view_char(ch);
+	fputs(cast_view_char(ch, 0), stdout);
 	term_reset();
 	printf("  ");
 	for( unsigned i = '\t'; i < 128; ++i ){
 		if( i != '\t' && i != '\n' && i < 32 ) continue;
-		if( range(vm, idrange, i ) ){
+		if( lips_range_test(d->vm, idrange, i ) ){
 			if( ch == i ) term_bcol(cmatch);
 			else term_bcol(cset);
 		}
@@ -152,43 +143,40 @@ __private void draw_range(lips_s* vm, unsigned idrange, long ch){
 			if( ch == i ) term_bcol(cerr);
 			else term_bcol(cunset);
 		}
-		putc_view_char(i);
+		fputs(cast_view_char(i, 0), stdout);
 	}
 	term_reset();
 }
 
-__private void draw_input(lips_s* vm, const utf8_t* txt, unsigned len, int oncol){
-	unsigned y = DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1;
-	draw_cls_rect(1, y, DBG_SCREEN_W, DBG_INP_H);
-	unsigned const ls = m_header(vm->stack)->len-1;
-	unsigned offx = vm->stack[ls].sp - txt;
+__private void draw_input(lipsVMDebug_s* d, int oncol){
+	term_surface_clear(d->input);
+	unsigned const ls = d->curStack;
+	unsigned offx = d->vm->stack[ls].sp - d->vm->txt;
 	long low = offx;
-	low -= DBG_SCREEN_W/2;
+	low -= (d->input->w-2)/2;
 	if( low < 0 ) low = 0;
-
-	unsigned high = low + DBG_SCREEN_W;
-
-	if( high > len ){
-		high = len;
-		low = (long)high - DBG_SCREEN_W;
+	unsigned high = low + d->input->w-2;
+	if( high > d->txtLen ){
+		high = d->txtLen;
+		low = (long)high - d->input->w-2;
 		if( low < 0 ) low = 0;
 	}
-	term_gotoxy(1, y);
+	term_gotoxy(d->input->x+1, d->input->y+1);
 	for( unsigned i = low; i < high; ++i ){
-		if( &txt[i] == vm->stack[ls].sp ){
+		if( &d->vm->txt[i] == d->vm->stack[ls].sp ){
 			switch( oncol ){
 				case 0: term_fcol(160); break;
 				case 1: term_fcol(46); break;
 			}
-			putc_view_char(txt[i]);
+			fputs(cast_view_char(d->vm->txt[i],0), stdout);
 			term_reset();
 			offx = i-low;
 		}
 		else{
-			putc_view_char(txt[i]);
+			fputs(cast_view_char(d->vm->txt[i],0), stdout);
 		}
 	}
-	term_gotoxy(1+offx, y+1);
+	term_gotoxy(d->input->x+offx+1, d->input->y+2);
 	switch( oncol ){
 		case 0: term_fcol(160); break;
 		case 1: term_fcol(46); break;
@@ -197,25 +185,25 @@ __private void draw_input(lips_s* vm, const utf8_t* txt, unsigned len, int oncol
 	term_reset();
 }
 
-__private void draw_opcode(lips_s* vm, unsigned pc, const char** nmap, unsigned curpc, const utf8_t* txt, unsigned len){
-	unsigned byc = vm->code[pc];
+__private void draw_opcode(lipsVMDebug_s* d, unsigned pc){
+	unsigned byc = d->vm->byc->code[pc];
 	switch( BYTECODE_CMD40(byc) ){
 		default : printf("INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
 		case OP_RANGE :
 			printf("range %u", BYTECODE_VAL12(byc));
-			if( curpc == pc ){
+			if( d->curPC == pc ){
 				term_reset();
-				draw_range(vm, BYTECODE_VAL12(byc), *vm->stack[m_header(vm->stack)->len-1].sp);
-				draw_input(vm, txt, len, !!range(vm, BYTECODE_VAL12(byc), *vm->stack[m_header(vm->stack)->len-1].sp));
+				draw_range(d, BYTECODE_VAL12(byc), *d->vm->stack[d->curStack].sp);
+				draw_input(d, !!lips_range_test(d->vm, BYTECODE_VAL12(byc), *d->vm->stack[d->curStack].sp));
 			}
 		break;
 		case OP_URANGE: break;
 		case OP_MATCH :  fputs("match", stdout); break;
 		case OP_CHAR  :
-			fputs("char  ", stdout); putc_view_char(BYTECODE_VAL08(byc)); 
-			if( curpc == pc ){
+			fputs("char  ", stdout); fputs(cast_view_char(BYTECODE_VAL08(byc),1), stdout);
+			if( d->curPC == pc ){
 				term_reset();
-				draw_input(vm, txt, len, BYTECODE_VAL08(byc) == *vm->stack[m_header(vm->stack)->len-1].sp);
+				draw_input(d, BYTECODE_VAL08(byc) == *d->vm->stack[d->curStack].sp);
 			}
 		break;
 		case OP_SPLITF: printf("split %X", pc + BYTECODE_VAL12(byc)); break;
@@ -224,17 +212,17 @@ __private void draw_opcode(lips_s* vm, unsigned pc, const char** nmap, unsigned 
 		case OP_SPLIRB: printf("splir %X", pc - BYTECODE_VAL12(byc)); break;
 		case OP_JMPF  : printf("jmp   %X", pc + BYTECODE_VAL12(byc)); break;
 		case OP_JMPB  : printf("jmp   %X", pc - BYTECODE_VAL12(byc)); break;
-		case OP_NODE  : printf("node  new::%s::%u", nmap[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
-		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), nmap[BYTECODE_VAL12(byc)], vm->fn[BYTECODE_VAL12(byc)]); break;
+		case OP_NODE  : printf("node  new::%s::%u", d->vm->byc->fnName[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
+		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), d->vm->byc->fnName[BYTECODE_VAL12(byc)], d->vm->byc->fn[BYTECODE_VAL12(byc)]); break;
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
 				case OPE_SAVE  : printf("save  %u", BYTECODE_VAL08(byc)); break;
 				case OPE_RET   : printf("ret   %u", BYTECODE_VAL08(byc)); break;
 				case OPE_NODEEX:
 					switch( BYTECODE_VAL08(byc) ){
-						case NOP_PARENT : printf("node   parent"); break;
-						case NOP_DISABLE: printf("node   disable"); break;
-						case NOP_ENABLE : printf("node   enable"); break;
+						case NOP_PARENT : printf("node  parent"); break;
+						case NOP_DISABLE: printf("node  disable"); break;
+						case NOP_ENABLE : printf("node  enable"); break;
 					}
 				break;
 				case OPE_ERROR: printf("error %u", BYTECODE_VAL08(byc)); break;
@@ -244,23 +232,23 @@ __private void draw_opcode(lips_s* vm, unsigned pc, const char** nmap, unsigned 
 	}
 }
 
-__private void draw_code(lips_s* vm, unsigned pc, const char** nmap, const utf8_t* txt, unsigned len){
-	unsigned y = DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1;
-	unsigned const count = vm->bytecode[BYC_CODELEN];
+__private void draw_code(lipsVMDebug_s* d){
+	unsigned const count = d->vm->byc->codeLen;
 	unsigned const csel  = 63;
-	draw_cls_rect(1, y, DBG_SCREEN_W, DBG_CODE_H);
-	long low  = pc;
-   	low -= DBG_CODE_H/2;
+	term_surface_clear(d->code);
+	long low  = d->curPC;
+   	low -= (d->code->h-2)/2;
 	if( low < 0 ) low = 0;
-	unsigned high = low + DBG_CODE_H;
+	unsigned high = low + d->code->h-2;
 	if( high > count ){
 		high = count;
-		low = (long)high - DBG_CODE_H;
+		low = (long)high - (d->code->h-2);
 		if( low < 0 ) low = 0;
 	}
+	unsigned y = d->code->y+1;
 	for(unsigned i = low; i < high; ++i ){
-		term_gotoxy(1, y++);
-		if( pc == i ){
+		term_gotoxy(d->code->x+1, y++);
+		if( d->curPC == i ){
 			term_fcol(csel);
 			printf(">");
 		}
@@ -268,57 +256,191 @@ __private void draw_code(lips_s* vm, unsigned pc, const char** nmap, const utf8_
 			printf(" ");
 		}
 		printf("%04X  ", i);
-		draw_opcode(vm, i, nmap, pc, txt, len);
+		draw_opcode(d, i);
 		term_reset();
 	}
 }
 
-__private char* prompt(void){
-	unsigned y =  DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1+DBG_INP_H+1;
-	draw_cls_rect(1, y, DBG_SCREEN_W, DBG_PROMPT_H);
-	term_gotoxy(1, y);
-	return readline("> ");
-}
-
-__private void onend(void){
-	term_gotoxy(0, DBG_HEADER_H+2+DBG_STACKED_H+1+DBG_RANGE_H+1+DBG_CODE_H+1+DBG_PROMPT_H+1+DBG_INP_H+1);
-	fflush(stdout);
-}
-
-__private void redraw(lipsdbg_s* l){
-	draw_range_clr();
-	draw_header(l->vm.sectionStart, l->vm.bytecode[BYC_RANGE_COUNT], l->vm.bytecode[BYC_FN_COUNT], l->curstk);
-	draw_stack(l->vm.stack, l->source);
-	draw_cstack(&l->vm);
-	draw_node(&l->vm, l->nmap, l->source);
-	draw_save(&l->vm, l->source);
-	if( l->curstk ){
-		draw_input(&l->vm, l->source, l->srclen, -1);
-		draw_code(&l->vm, l->vm.stack[l->curstk-1].pc, l->nmap, l->source, l->srclen);
+__private void draw_step(lipsVMDebug_s* d){
+	term_surface_clear(d->header);
+	term_surface_focus(d->header);
+	printf("start:%04X ranges:%u functions:%u stacksize:%u", d->vm->byc->start, d->vm->byc->rangeCount, d->vm->byc->fnCount, d->stackLen);
+	reverse_draw(d, d->stack, m_header(d->vm->stack)->len, revdraw_stack);
+	reverse_draw(d, d->cstack, m_header(d->vm->cstk)->len, revdraw_cstack);
+	reverse_draw(d, d->node, m_header(d->vm->node)->len, revdraw_node);
+	reverse_draw(d, d->save, d->vm->ls+1, revdraw_save);
+	term_surface_clear(d->range);
+	if( d->stackLen ){
+		draw_input(d, -1);
+		draw_code(d);
 	}
-	fflush(stdout);
-}
-*/
-void lips_vm_debug(lipsVM_s* vm){
-	dbg_info("");
-	lipsVMDebug_s d;
-	d_create_surface(&d);
-	d.vm = vm;
-	term_cls();
-	term_multi_surface_draw(&d.tms);
-	draw_step(&d);
 	term_flush();
 }
 
+__private void prompt(lipsVMDebug_s* d){
+	term_surface_clear(d->prompt);
+	term_surface_focus(d->prompt);
+	free(d->cinp.line);
+	m_free(d->cinp.argv);
+	d->cinp.line = readline("> ");
+	d->cinp.argv = str_splitin(d->cinp.line, " ", 0);
+	if( m_header(d->cinp.argv)->len == 0 ){
+		unsigned i = m_ipush(&d->cinp.argv);
+		d->cinp.argv[i] = d->cinp.line;
+	}
+}
+
+__private int pccmp(const void* a, const void* b){
+	return *(uint32_t*)a - *(uint32_t*)b;
+}
+
+__private long breakpoint_find(lipsVMDebug_s* d, uint32_t pc){
+	return m_ibsearch(d->breakpoint, &pc, pccmp);
+}
+
+__private void breakpoint_add(lipsVMDebug_s* d, uint32_t pc){
+	if( breakpoint_find(d, pc) == -1 && pc < d->vm->byc->codeLen ){
+		unsigned i = m_ipush(&d->breakpoint);
+		d->breakpoint[i] = pc;
+		m_qsort(d->breakpoint, pccmp);
+	}
+}
+
+__private void breakpoint_rm(lipsVMDebug_s* d, uint32_t pc){
+	long id = breakpoint_find(d, pc);
+	if( id < 0 ) return;
+	m_delete(d->breakpoint, id, 1);
+}
+
+__private void action_nop(__unused lipsVMDebug_s* l){}
+
+__private void action_step(lipsVMDebug_s* d){
+	d->state = DBG_STATE_STEP;
+}
+
+__private void action_next(lipsVMDebug_s* d){
+	const unsigned pc  = d->vm->stack[d->curStack].pc;
+	const unsigned byc = d->vm->byc->code[pc];
+	if( BYTECODE_CMD40(byc) == OP_CALL ){
+		breakpoint_add(d, pc+1);
+		d->brrm = 1;
+		if( d->curStack ){
+			breakpoint_add(d, d->vm->stack[d->curStack-1].pc);
+			++d->brrm;
+		}
+		d->state = DBG_STATE_RUN;
+	}
+	else{
+		d->state = DBG_STATE_STEP;
+	}
+}
+
+__private void action_continue(lipsVMDebug_s* d){
+	d->state = DBG_STATE_RUN;
+}
+
+__private void action_quit(lipsVMDebug_s* d){
+	d->state = DBG_STATE_QUIT;
+}
+
+__private void action_breakpoint(lipsVMDebug_s* d){
+	breakpoint_add(d, strtoul(d->cinp.argv[1], NULL, 16));
+}
+
+__private void action_breakremove(lipsVMDebug_s* d){
+	breakpoint_rm(d, strtoul(d->cinp.argv[1], NULL, 16));
+}
+
+cmdmap_s CMD[] = {{
+		.shr = "",
+		.lng = "",
+		.act = action_nop,
+		.nam = 0
+	},{
+		.shr = "s",
+		.lng = "step",
+		.act = action_step,
+		.nam = 0
+	},{
+		.shr = "n",
+		.lng = "next",
+		.act = action_next,
+		.nam = 0
+	},{
+		.shr = "c",
+		.lng = "continue",
+		.act = action_continue,
+		.nam = 0
+	},{
+		.shr = "q",
+		.lng = "quit",
+		.act = action_quit,
+		.nam = 0
+	},{
+		.shr = "b",
+		.lng = "breakpoint",
+		.act = action_breakpoint,
+		.nam = 1
+	},{
+	},{
+		.shr = "br",
+		.lng = "breakremove",
+		.act = action_breakremove,
+		.nam = 1
+	}
+};
+
+__private void command_parse(lipsVMDebug_s* d){
+	for( unsigned i = 0; i < sizeof_vector(CMD); ++i ){
+		if( !strcmp(d->cinp.argv[0], CMD[i].shr) || !strcmp(d->cinp.argv[0], CMD[i].lng) ){
+			if( CMD[i].nam == m_header(d->cinp.argv)->len-1 ) CMD[i].act(d);
+			CMD[0].act = CMD[i].act;
+			return;
+		}
+	}
+}
+
+void lips_vm_debug(lipsVM_s* vm){
+	dbg_info("");
+	lipsVMDebug_s d;
+	d.txtLen = strlen((char*)vm->txt);
+	d_create_surface(&d);
+	d.vm = vm;
+	d.cinp.line  = NULL;
+	d.cinp.argv  = NULL;
+	d.state      = DBG_STATE_BREAK;
+	d.brrm       = 0;
+	d.breakpoint = MANY(uint32_t, 16);
+
+	term_cls();
+	term_multi_surface_draw(&d.tms);
+	
+	do{
+		d.stackLen =  m_header(vm->stack)->len;
+		d.curStack = d.stackLen ? d.stackLen - 1: 0;
+		d.curPC    = d.stackLen ? vm->stack[d.curStack].pc: 0;
+		draw_step(&d);
+		if( breakpoint_find(&d, d.curPC) != -1 ) d.state = DBG_STATE_BREAK;
+		if( d.state == DBG_STATE_STEP ) d.state = DBG_STATE_BREAK;
+		while( d.state == DBG_STATE_BREAK ){
+			if( d.brrm ){
+				m_header(d.breakpoint)->len -= d.brrm;
+				d.brrm = 0;
+			}
+			prompt(&d);
+			command_parse(&d);
+		}
+	}while( d.state != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
+	
+	term_cls();
+	term_flush();
+}
 
 void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
 	if( m->count < 0 ){
 		fprintf(f, "lips error: internal error, this never append for now\n");
 	}
-	else if( m->count > 0 ){
-		fprintf(f, "lips error: no errors, lips have match\n");
-	}
-	else if( m->err.number ){
+	else if( !m->count && m->err.number ){
 		fprintf(f, "lips fail: %u\n", m->err.number);
 		const char*    sp    = (const char*)m->err.loc;
 		const unsigned len   = strlen((const char*)source);
@@ -336,12 +458,74 @@ void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
 		}
 		fputs("^\n", f);
 	}
-	else{
-		fprintf(f, "lips error: match not have mark any type of error but not have match\n");
-	}
 	fflush(f);
 }
 
+void lips_dump_capture(lipsMatch_s* m, FILE* f){
+	if( m->count < 0 ){
+		fputs("lips capture: error, this never append for now\n", f);
+		return;
+	}
+	for( int i = 0; i < m->count; ++i ){
+		unsigned st = i*2;
+		unsigned en = st+1;
+		unsigned len = m->capture[en] - m->capture[st];
+		fprintf(f, "<capture%u>%.*s</capture%u>\n", i, len, m->capture[st], i);
+	}
+}
 
+__private void ast_dump_file(lipsAst_s* ast, const char** nmap, unsigned tab, FILE* f){
+	for( unsigned i = 0; i < tab; ++i ){
+		fputs("  ", f);
+	}
+	if( m_header(ast->child)->len ){
+		fprintf(f, "<%s>\n", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		mforeach(ast->child,i){
+			ast_dump_file(&ast->child[i], nmap, tab+1, f);
+		}
+	}
+	else{
+		fprintf(f, "<%s> '", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		for( unsigned i = 0; i < ast->len; ++i ){
+			fputs(cast_view_char(ast->sp[i], 0), f);
+		}
+		fputs("'\n", f);
+	}
+}
+
+__private void dump_dot(lipsAst_s* ast, const char** nmap, FILE* f, const char* parent, unsigned index){
+	__free char* name = str_printf("%s_%s_%d", parent, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id], index);
+	if( *parent ) fprintf(f, "%s -> %s;\n",parent, name);
+
+	if( m_header(ast->child)->len ){
+		fprintf(f, "%s [label=\"%s\"];\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		mforeach(ast->child,i){
+			dump_dot(&ast->child[i], nmap, f, name, i);
+		}
+	}
+	else{
+		fprintf(f, "%s [label=\"%s\\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
+		for( unsigned i = 0; i < ast->len; ++i ){
+			fputs(cast_view_char(ast->sp[i], 0), f);
+		}
+		fprintf(f, "\"];\n");
+	}
+}
+
+__private void ast_dump_dot(lipsAst_s* ast, const char** nmap, FILE* f){
+	fputs("digraph {\n", f);
+	dump_dot(ast, nmap, f, "", 0);
+	fputs("}\n", f);
+}
+
+void lips_dump_ast(lipsVM_s* vm, FILE* f, int mode){
+	if( !vm->match->ast ) return;
+	if( vm->match->count < 1 ) return;
+	switch( mode ){
+		case 0: ast_dump_file(vm->match->ast, vm->byc->fnName, 0, f); break;
+		case 1: ast_dump_dot(vm->match->ast, vm->byc->fnName, f); break;
+	}
+	fflush(f);
+}
 
 

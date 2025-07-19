@@ -9,10 +9,10 @@
 #define LIPS_DBG_HEADER_H  3
 #define LIPS_DBG_HEADER_W  LIPS_DBG_SCREEN_W
 #define LIPS_DBG_STACKED_H 7
-#define LIPS_DBG_STACK_W   (LIPS_DBG_SCREEN_W/4+3)
-#define LIPS_DBG_CSTACK_W  (LIPS_DBG_SCREEN_W/4)
-#define LIPS_DBG_NODE_W    (LIPS_DBG_SCREEN_W/4)
-#define LIPS_DBG_CAPTURE_W (LIPS_DBG_SCREEN_W/4)
+#define LIPS_DBG_STACK_W   30
+#define LIPS_DBG_CSTACK_W  20
+#define LIPS_DBG_NODE_W    53
+#define LIPS_DBG_CAPTURE_W 20
 #define LIPS_DBG_RANGE_H   3
 #define LIPS_DBG_RANGE_W   LIPS_DBG_SCREEN_W
 #define LIPS_DBG_CODE_H    17
@@ -24,6 +24,7 @@
 
 void lips_vm_debug(lipsVM_s* vm);
 void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f);
-
+void lips_dump_capture(lipsMatch_s* m, FILE* f);
+void lips_dump_ast(lipsVM_s* vm, FILE* f, int mode);
 
 #endif

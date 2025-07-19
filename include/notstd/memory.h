@@ -213,9 +213,17 @@ __private void* m_qsort(void* mem, cmp_f cmp){
 }
 
 //classic bsearch
-__private void* mem_bsearch(void* mem, void* search, cmp_f cmp){
+__private void* m_bsearch(void* mem, void* search, cmp_f cmp){
 	hmem_s* hm = m_header(mem);
 	return bsearch(search, mem, hm->len, hm->sof, cmp);
+}
+
+//same bsearch but return index
+__private long m_ibsearch(void* mem, void* search, cmp_f cmp){
+	hmem_s* hm = m_header(mem);
+	void* r = bsearch(search, mem, hm->len, hm->sof, cmp);
+	if( !r ) return -1;
+	return (r - mem) / hm->sof;
 }
 
 //position by index: -1 == last element, < 0 index by right, >=0 index by left, if index > len index = len-1
