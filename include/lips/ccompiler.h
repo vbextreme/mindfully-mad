@@ -148,17 +148,6 @@ void lcc_err_die(lcc_s* lc);
 	LABEL(LNOR[0]);\
 }while(0)
 
-//
-//     split l1
-// [1]    cmda
-//     jmp l0
-// l1: split l2
-// [2]    cmdb
-//     jmp l0
-// l2: [3] cmdc
-// l0:
-//
-
 #define CHOOSE_BEGIN(N) do{\
 	unsigned _incor = 1;\
 	unsigned const _maxcor = N;\

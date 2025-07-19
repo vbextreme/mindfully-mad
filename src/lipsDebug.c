@@ -382,7 +382,6 @@ cmdmap_s CMD[] = {{
 		.act = action_breakpoint,
 		.nam = 1
 	},{
-	},{
 		.shr = "br",
 		.lng = "breakremove",
 		.act = action_breakremove,
