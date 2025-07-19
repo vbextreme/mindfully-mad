@@ -9,7 +9,7 @@ quantifier: qtype
           | qspec
           ;
 
-rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/]/;
+rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
 rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
 rx_char    : rx_escaped
            | rx_literal
@@ -24,9 +24,9 @@ rx_any   : /./;
 rx_unnamed: /\?:/;
 rx_group  : /\(/ rx_unnamed? rx_altern /\)/;
 rx_primary: rx_literal
+          | rx_escaped
           | rx_group
           | rx_class
-          | rx_escaped
           | rx_any
           ;
 

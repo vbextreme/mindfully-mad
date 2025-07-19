@@ -12,7 +12,7 @@ quantifier: qtype
           | qspec
           ;
 
-rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/]/;
+rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
 rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
 rx_char    : rx_escaped
            | rx_literal
@@ -27,9 +27,9 @@ rx_any   : /./;
 rx_unnamed: /\?:/;
 rx_group  : /\(/ rx_unnamed? rx_altern /\)/;
 rx_primary: rx_literal
+          | rx_escaped
           | rx_group
           | rx_class
-          | rx_escaped
           | rx_any
           ;
 
@@ -158,7 +158,7 @@ __private void def_quantifier(lcc_s* lc){
 
 //rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/];
 __private void def_rx_literal(lcc_s* lc){
-	token_class(lc, "rx_literal", "|*+?(){}[]./", 1, 1, 0);
+	token_class(lc, "rx_literal", "|*+?(){}[]./\\", 1, 1, 0);
 }
 
 //rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
@@ -247,9 +247,9 @@ __private void def_rx_group(lcc_s* lc){
 }
 
 //rx_primary: rx_literal
+//          | rx_escaped
 //          | rx_group
 //          | rx_class
-//          | rx_escaped
 //          | rx_any
 //          ;
 __private void def_rx_primary(lcc_s* lc){
@@ -258,11 +258,11 @@ __private void def_rx_primary(lcc_s* lc){
 		CHOOSE_BEGIN(5);
 			CALL("rx_literal");
 		CHOOSE();
+			CALL("rx_escaped");
+		CHOOSE();
 			CALL("rx_group");
 		CHOOSE();
 			CALL("rx_class");
-		CHOOSE();
-			CALL("rx_escaped");
 		CHOOSE();
 			CALL("rx_any");
 		CHOOSE_END();
