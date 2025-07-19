@@ -3,6 +3,7 @@
 ###########
 #
 #-S liburing linux-headers
+#dot -Tpng name.dot -o name.png
 
 project('lips', 'c', version: '0.2.0')
 cc = meson.get_compiler('c')
