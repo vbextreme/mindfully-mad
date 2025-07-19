@@ -24,6 +24,7 @@ typedef struct lipsVMDebug{
 	termSurface_s*     cstack;
 	termSurface_s*     node;
 	termSurface_s*     save;
+	termSurface_s*     brk;
 	termSurface_s*     range;
 	termSurface_s*     input;
 	termSurface_s*     code;
@@ -59,6 +60,7 @@ __private void d_create_surface(lipsVMDebug_s* d){
 	term_multi_surface_hsplit(m, LIPS_DBG_CSTACK_W);
 	term_multi_surface_hsplit(m, LIPS_DBG_NODE_W);
 	term_multi_surface_hsplit(m, LIPS_DBG_CAPTURE_W);
+	term_multi_surface_hsplit(m, LIPS_DBG_BREAK_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_RANGE_H);
 	term_multi_surface_hsplit(m, LIPS_DBG_RANGE_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_CODE_H);
@@ -73,6 +75,7 @@ __private void d_create_surface(lipsVMDebug_s* d){
 	d->cstack = &m->line[1].surface[1];
 	d->node   = &m->line[1].surface[2];
 	d->save   = &m->line[1].surface[3];
+	d->brk    = &m->line[1].surface[4];
 	d->range  = &m->line[2].surface[0];
 	d->code   = &m->line[3].surface[0];
 	d->prompt = &m->line[4].surface[0];
@@ -115,6 +118,10 @@ __private void revdraw_node(lipsVMDebug_s* d, unsigned sc){
 
 __private void revdraw_save(lipsVMDebug_s* d, unsigned sc){
 	printf(" $(%3u) %ld", sc, d->vm->match->capture[sc] ? d->vm->match->capture[sc] - d->vm->txt : -1);
+}
+
+__private void revdraw_breakpoint(lipsVMDebug_s* d, unsigned sc){
+	printf(" X %X", d->breakpoint[sc]);
 }
 
 __private void draw_range(lipsVMDebug_s* d, unsigned idrange, long ch){
@@ -269,6 +276,7 @@ __private void draw_step(lipsVMDebug_s* d){
 	reverse_draw(d, d->cstack, m_header(d->vm->cstk)->len, revdraw_cstack);
 	reverse_draw(d, d->node, m_header(d->vm->node)->len, revdraw_node);
 	reverse_draw(d, d->save, d->vm->ls+1, revdraw_save);
+	reverse_draw(d, d->brk, m_header(d->breakpoint)->len, revdraw_breakpoint);
 	term_surface_clear(d->range);
 	if( d->stackLen ){
 		draw_input(d, -1);
@@ -303,6 +311,7 @@ __private void breakpoint_add(lipsVMDebug_s* d, uint32_t pc){
 		unsigned i = m_ipush(&d->breakpoint);
 		d->breakpoint[i] = pc;
 		m_qsort(d->breakpoint, pccmp);
+		reverse_draw(d, d->brk, m_header(d->breakpoint)->len, revdraw_breakpoint);
 	}
 }
 
@@ -310,6 +319,7 @@ __private void breakpoint_rm(lipsVMDebug_s* d, uint32_t pc){
 	long id = breakpoint_find(d, pc);
 	if( id < 0 ) return;
 	m_delete(d->breakpoint, id, 1);
+	reverse_draw(d, d->brk, m_header(d->breakpoint)->len, revdraw_breakpoint);
 }
 
 __private void action_nop(__unused lipsVMDebug_s* l){}
