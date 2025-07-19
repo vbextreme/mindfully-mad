@@ -55,7 +55,7 @@ builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
 rule_flags  : unstore? match?;
 rule_def    : skip word rule_flags skip rulestart;
 rule_group  : /\(/ skip rule_altern skip /\)/;
-rule_binerr : /$\[/ num /\]/;
+rule_binerr : /\$\[/ num /\]/;
 rule_primary: regex
             | rule_group
             | rule_binerr
@@ -70,7 +70,7 @@ lips: builtin_error
     | rule
     ;
 
-grammar_end-@: /\0/;
+grammar_end-@: skip  /\0/;
 grammar: regex
        | lips
        | grammar_end
@@ -523,10 +523,11 @@ __private void def_lips(lcc_s* lc){
 	}
 }
 
-//grammar_end-@: /\0/;
+//grammar_end-@: skip /\0/;
 __private void def_grammar_end(lcc_s* lc){
 	INIT(lc);
 	FN("grammar_end", 0){
+		CALL("skip");
 		CHAR('\0');
 		MATCH();
 	}

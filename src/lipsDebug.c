@@ -165,7 +165,7 @@ __private void draw_input(lipsVMDebug_s* d, int oncol){
 	unsigned high = low + d->input->w-2;
 	if( high > d->txtLen ){
 		high = d->txtLen;
-		low = (long)high - d->input->w-2;
+		low = (long)high - (d->input->w-2);
 		if( low < 0 ) low = 0;
 	}
 	term_gotoxy(d->input->x+1, d->input->y+1);
@@ -290,7 +290,9 @@ __private void prompt(lipsVMDebug_s* d){
 	term_surface_focus(d->prompt);
 	free(d->cinp.line);
 	m_free(d->cinp.argv);
+	term_flush();
 	d->cinp.line = readline("> ");
+	term_flush();
 	d->cinp.argv = str_splitin(d->cinp.line, " ", 0);
 	if( m_header(d->cinp.argv)->len == 0 ){
 		unsigned i = m_ipush(&d->cinp.argv);
