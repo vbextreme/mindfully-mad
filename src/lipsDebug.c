@@ -117,7 +117,7 @@ __private void revdraw_node(lipsVMDebug_s* d, unsigned sc){
 }
 
 __private void revdraw_save(lipsVMDebug_s* d, unsigned sc){
-	printf(" $(%3u) %ld", sc, d->vm->match->capture[sc] ? d->vm->match->capture[sc] - d->vm->txt : -1);
+	printf(" $(%3u) %6ld", sc, d->vm->match->capture[sc] ? d->vm->match->capture[sc] - d->vm->txt : -1);
 }
 
 __private void revdraw_breakpoint(lipsVMDebug_s* d, unsigned sc){
