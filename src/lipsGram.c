@@ -1,8 +1,6 @@
 #include <lips/ccompiler.h>
 /* breakpoint list
- * 123 regex
- * 126 rule_group
- * 132 rule_primary
+ * rx_altern fail
  *
 */
 /* 14E -> 123 regex -> 7A primary

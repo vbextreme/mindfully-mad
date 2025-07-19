@@ -6,10 +6,6 @@
 #include <lips/bytecode.h>
 #include <lips/debug.h>
 
-//TODO
-//dbginput scorre male
-//dump ast, visualizzare il contenuto in una linea singola, quindi sovrascrivere \t\n
-
 
 typedef enum{
 	OPT_g,
