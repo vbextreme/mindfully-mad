@@ -306,13 +306,15 @@ __private long breakpoint_find(lipsVMDebug_s* d, uint32_t pc){
 	return m_ibsearch(d->breakpoint, &pc, pccmp);
 }
 
-__private void breakpoint_add(lipsVMDebug_s* d, uint32_t pc){
+__private unsigned breakpoint_add(lipsVMDebug_s* d, uint32_t pc){
 	if( breakpoint_find(d, pc) == -1 && pc < d->vm->byc->codeLen ){
 		unsigned i = m_ipush(&d->breakpoint);
 		d->breakpoint[i] = pc;
 		m_qsort(d->breakpoint, pccmp);
 		reverse_draw(d, d->brk, m_header(d->breakpoint)->len, revdraw_breakpoint);
+		return 1;
 	}
+	return 0;
 }
 
 __private void breakpoint_rm(lipsVMDebug_s* d, uint32_t pc){
@@ -332,11 +334,10 @@ __private void action_next(lipsVMDebug_s* d){
 	const unsigned pc  = d->vm->stack[d->curStack].pc;
 	const unsigned byc = d->vm->byc->code[pc];
 	if( BYTECODE_CMD40(byc) == OP_CALL ){
-		breakpoint_add(d, pc+1);
-		d->brrm = 1;
+		d->brrm = 0;
+		d->brrm += breakpoint_add(d, pc+1);
 		if( d->curStack ){
-			breakpoint_add(d, d->vm->stack[d->curStack-1].pc);
-			++d->brrm;
+			d->brrm += breakpoint_add(d, d->vm->stack[d->curStack-1].pc);
 		}
 		d->state = DBG_STATE_RUN;
 	}
@@ -433,6 +434,7 @@ void lips_vm_debug(lipsVM_s* vm){
 		if( d.state == DBG_STATE_STEP ) d.state = DBG_STATE_BREAK;
 		while( d.state == DBG_STATE_BREAK ){
 			if( d.brrm ){
+				iassert(m_header(d.breakpoint)->len >= d.brrm);
 				m_header(d.breakpoint)->len -= d.brrm;
 				d.brrm = 0;
 			}

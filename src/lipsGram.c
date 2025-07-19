@@ -1,5 +1,10 @@
 #include <lips/ccompiler.h>
-
+/* breakpoint list
+ * 123 regex
+ * 126 rule_group
+ * 132 rule_primary
+ *
+*/
 /* 14E -> 123 regex -> 7A primary
 @error[1] 'unknown symbol at this state';
 
