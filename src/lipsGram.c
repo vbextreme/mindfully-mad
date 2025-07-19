@@ -22,8 +22,8 @@ rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
 rx_char    : rx_escaped
            | rx_literal
            ;
-rx_range   : rx_char ('-' rx_char)?;
-rx_class   : '[' rx_range+ ']';
+rx_range   : rx_char (/-/ rx_char)?;
+rx_class   : /[/ rx_range+ /]/;
 
 rx_begin : /\^/;
 rx_end   : /\$/;
@@ -40,7 +40,7 @@ rx_primary: rx_literal
 
 rx_repeat : rx_primary quantifier?;
 rx_concat : rx_repeat+;
-rx_altern : rx_concat ( '|' rx_concat )*;
+rx_altern : rx_concat ( /|/ rx_concat )*;
 regex     : /\// rx_begin? rx_altern rx_end? /\//;
 
 sep-      : /[ \t\n]+/;
@@ -64,9 +64,9 @@ rule_primary: regex
             | word
             ;
 rule_repeat : skip rule_primary quantifier?;
-rule_concat : rule_repeat+ rule_end;
-rule_altern : rule_concat ( '|' rule_concat )*;
-rule        : rule_def skip rule_altern;
+rule_concat : rule_repeat+;
+rule_altern : rule_concat ( skip /|/ rule_concat )*;
+rule        : rule_def skip rule_altern rule_end;
 
 lips: builtin_error
     | rule
@@ -484,16 +484,16 @@ __private void def_rule_concat(lcc_s* lc){
 	INIT(lc);
 	FN("rule_concat", 1){
 		OMQ(CALL("rule_repeat"););
-		CALL("rule_end");
 	}
 }
 
-//rule_altern : rule_concat ( '|' rule_concat )*;
+//rule_altern : rule_concat ( skip /|/ rule_concat )*;
 __private void def_rule_altern(lcc_s* lc){
 	INIT(lc);
 	FN("rule_altern", 1){
 		CALL("rule_concat");
 		ZMQ(
+			CALL("skip");
 			CHAR('|');
 			CALL("rule_concat");
 		);
@@ -507,6 +507,7 @@ __private void def_rule(lcc_s* lc){
 		CALL("rule_def");
 		CALL("skip");
 		CALL("rule_altern");
+		CALL("rule_end");
 	}
 }
 
