@@ -121,7 +121,7 @@ __private void revdraw_save(lipsVMDebug_s* d, unsigned sc){
 }
 
 __private void revdraw_breakpoint(lipsVMDebug_s* d, unsigned sc){
-	printf(" X %X", d->breakpoint[sc]);
+	printf(" X %4X", d->breakpoint[sc]);
 }
 
 __private void draw_range(lipsVMDebug_s* d, unsigned idrange, long ch){
