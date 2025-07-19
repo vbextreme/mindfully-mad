@@ -157,6 +157,7 @@ void lcc_err_die(lcc_s* lc);
 	JMP(_choose[0]);\
 	LABEL(_choose[_incor]);\
 	++_incor;\
+	SPLIT(_choose[_incor]);\
 }while(0)
 
 #define CHOOSE_END() LABEL(_choose[0]);\
