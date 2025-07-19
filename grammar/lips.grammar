@@ -10,7 +10,7 @@ quantifier: qtype
           ;
 
 rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
-rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
+rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
 rx_char    : rx_escaped
            | rx_literal
            ;
@@ -32,7 +32,7 @@ rx_primary: rx_literal
 
 rx_repeat : rx_primary quantifier?;
 rx_concat : rx_repeat+;
-rx_altern : rx_concat ( /|/ rx_concat )*;
+rx_altern : rx_concat ( /\|/ rx_concat )*;
 regex     : /\// rx_begin? rx_altern rx_end? /\//;
 
 sep-      : /[ \t\n]+/;
@@ -57,7 +57,7 @@ rule_primary: regex
             ;
 rule_repeat : skip rule_primary quantifier?;
 rule_concat : rule_repeat+;
-rule_altern : rule_concat ( skip /|/ rule_concat )*;
+rule_altern : rule_concat ( skip /\|/ rule_concat )*;
 rule        : rule_def skip rule_altern rule_end;
 
 lips: builtin_error

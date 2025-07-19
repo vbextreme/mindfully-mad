@@ -151,7 +151,7 @@ void lcc_err_die(lcc_s* lc);
 #define CHOOSE_BEGIN(N) do{\
 	unsigned _incor = 1;\
 	unsigned const _maxcor = N;\
-	USENELBL(_choose, _maxcor);\
+	USENELBL(_choose, N);\
 	SPLIT(_choose[_incor])
 
 #define CHOOSE() do{\

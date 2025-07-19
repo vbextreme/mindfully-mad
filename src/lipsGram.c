@@ -16,7 +16,7 @@ quantifier: qtype
           ;
 
 rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
-rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
+rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
 rx_char    : rx_escaped
            | rx_literal
            ;
@@ -38,7 +38,7 @@ rx_primary: rx_literal
 
 rx_repeat : rx_primary quantifier?;
 rx_concat : rx_repeat+;
-rx_altern : rx_concat ( /|/ rx_concat )*;
+rx_altern : rx_concat ( /\|/ rx_concat )*;
 regex     : /\// rx_begin? rx_altern rx_end? /\//;
 
 sep-      : /[ \t\n]+/;
@@ -164,11 +164,11 @@ __private void def_rx_literal(lcc_s* lc){
 	token_class(lc, "rx_literal", "|*+?(){}[]./\\", 1, 1, 0);
 }
 
-//rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
+//rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
 __private void def_rx_escaped(lcc_s* lc){
 	INIT(lc);
 	USERANGE();
-	RRSTR("|*+?(){}[].^$;\\0/", 0);
+	RRSTR("|*+?(){}[].^$;\\0/tn", 0);
 	unsigned ir = RRADD();
 	FN("rx_escaped", 1){
 		CHAR('\\');
