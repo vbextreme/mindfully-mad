@@ -1,20 +1,19 @@
 #include <lips/ccompiler.h>
 
-/* dbg 14f -> 126 regex ->-> 90 rx_primary
+/* 14E -> 123 regex -> 7A primary
 @error[1] 'unknown symbol at this state';
 
 num       : /[0-9]+/;
 lnum      : num;
 rnum      : num;
 qtype     : /[\*\+\?]/;
-qspec     : /{/ lnum (/,/ rnum?)? /}/;
+qspec     : /\{/ lnum (/,/ rnum?)? /\}/;
 quantifier: qtype
           | qspec
           ;
 
-rx_operator: /[\|\*\+\?\(\)\{\}\[\]]/;
-rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.]/;
-rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;]/;
+rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/]/;
+rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
 rx_char    : rx_escaped
            | rx_literal
            ;
@@ -157,21 +156,16 @@ __private void def_quantifier(lcc_s* lc){
 	}
 }
 
-//rx_operator: /[\|\*\+\?\(\)\{\}\[\]]/;
-__private void def_rx_operator(lcc_s* lc){
-	token_class(lc, "rx_operator", "|*+?(){}[]", 0, 1, 0);
-}
-
-//rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.];
+//rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/];
 __private void def_rx_literal(lcc_s* lc){
-	token_class(lc, "rx_literal", "|*+?(){}[].", 1, 1, 0);
+	token_class(lc, "rx_literal", "|*+?(){}[]./", 1, 1, 0);
 }
 
-//rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;]/;
+//rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/]/;
 __private void def_rx_escaped(lcc_s* lc){
 	INIT(lc);
 	USERANGE();
-	RRSTR("|*+?(){}[].^$;0", 0);
+	RRSTR("|*+?(){}[].^$;\\0/", 0);
 	unsigned ir = RRADD();
 	FN("rx_escaped", 1){
 		CHAR('\\');
@@ -570,7 +564,7 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_qtype(ROBJ());
 	def_qspec(ROBJ());
 	def_quantifier(ROBJ());
-	def_rx_operator(ROBJ());
+	//def_rx_operator(ROBJ());
 	def_rx_literal(ROBJ());
 	def_rx_escaped(ROBJ());
 	def_rx_char(ROBJ());
