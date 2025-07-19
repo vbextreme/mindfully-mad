@@ -68,7 +68,7 @@ src += [ 'src/lipsVm.c' ]
 src += [ 'src/lipsDebug.c' ]
 src += [ 'src/lipsCcompiler.c' ]
 src += [ 'src/lipsGram.c' ]
-src += [ 'src/mbi.c' ]
+src += [ 'src/lips.c' ]
 
 ##############
 # data files #
