@@ -74,6 +74,7 @@ MATCH
 */
 
 __private void stk_push(lipsVM_s* vm, unsigned pc, const utf8_t* sp){
+	if( pc >= vm->byc->codeLen ) return;
 	unsigned i = m_ipush(&vm->stack);
 	vm->stack[i].pc = pc;
 	vm->stack[i].sp = sp;
@@ -103,7 +104,12 @@ __private void stk_return_call_success(lipsVM_s* vm, unsigned pos){
 
 __private void stk_return_call_fail(lipsVM_s* vm, unsigned pos){
 	iassert(pos>0);
-	m_header(vm->stack)->len = pos-1;
+	if( pos ){
+		m_header(vm->stack)->len = pos-1;
+	}
+	else{
+		m_header(vm->stack)->len = 0;
+	}
 }
 
 lipsVM_s* lips_vm_ctor(lipsVM_s* vm, lipsByc_s* byc){
@@ -122,6 +128,26 @@ void lips_vm_dtor(lipsVM_s* vm){
 	m_free(vm->node);
 }
 
+lipsMatch_s* lips_match_ctor(lipsMatch_s* match){
+	match->err.asl = MANY(lipsAsl_s,1024);
+	match->ast     = NULL;
+	return match;
+}
+
+void lips_match_dtor(lipsMatch_s* match){
+	lips_ast_dtor(match->ast);
+	m_free(match->err.asl);
+}
+
+__private void lips_match_reset(lipsMatch_s* match){
+	memset(match->capture, 0, sizeof match->capture);
+	match->err.number = 0;
+	match->err.loc    = NULL;
+	match->ast        = NULL;
+	match->count      = 0;
+	m_clear(match->err.asl);
+}
+
 void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt){
 	dbg_info("");
 	m_clear(vm->stack);
@@ -130,11 +156,7 @@ void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt){
 	if( txt ) vm->txt = txt;
 	vm->ls = -1;
 	vm->match = match;
-	memset(vm->match->capture, 0, sizeof vm->match->capture);
-	vm->match->err.number = 0;
-	vm->match->err.loc    = NULL;
-	vm->match->ast        = NULL;
-	vm->match->count      = 0;
+	lips_match_reset(vm->match);
 	stk_push(vm, vm->byc->start, txt);
 }
 
@@ -161,6 +183,10 @@ __private void op_ret(lipsVM_s* vm, int fail){
 	long i = m_ipop(vm->cstk);
 	if( i >=0 ){
 		if( fail ){
+			if( vm->sp > vm->match->err.loc ){
+				vm->match->err.loc = vm->sp;
+				vm->match->err.asl = m_copy(vm->match->err.asl, vm->node, 0);
+			}
 			stk_return_call_fail(vm, vm->cstk[i]);
 		}
 		else{

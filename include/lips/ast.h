@@ -26,6 +26,7 @@ typedef struct lipsAst{
 }lipsAst_s;
 
 lipsAst_s* lips_ast_make(lipsAsl_s* node);
+void lips_ast_dtor(lipsAst_s* node);
 
 #endif
 

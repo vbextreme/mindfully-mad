@@ -541,14 +541,14 @@ __private void def_grammar_end(lcc_s* lc){
 __private void def_grammar(lcc_s* lc){
 	INIT(lc);
 	FN("grammar", 1){
-		CHOOSE_BEGIN(4);
+		CHOOSE_BEGIN(3);
 		CALL("regex");
 		CHOOSE();
 		CALL("lips");
 		CHOOSE();
 		CALL("grammar_end");
-		CHOOSE();
-		ERROR(1);
+		//CHOOSE();
+		//ERROR(1);
 		CHOOSE_END();
 	}
 }

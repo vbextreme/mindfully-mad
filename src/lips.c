@@ -70,6 +70,7 @@ int main(int argc, char** argv){
 	
 	if( opt[OPT_g].set ){
 		lipsMatch_s m;
+		lips_match_ctor(&m);
 		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_g].value->str);
 		lips_vm_reset(&vm, &m, source);
 		if( lips_vm_match(&vm) < 1 ){
@@ -79,24 +80,23 @@ int main(int argc, char** argv){
 		die("TODO extract new grammar");
 		lipsByc_dtor(&lbyc);
 		lips_vm_dtor(&vm);
+		lips_match_dtor(&m);
 		lipsByc_ctor(&lbyc, lgram);
 		lips_vm_ctor(&vm, &lbyc);
 	}
 
+	lipsMatch_s m;
+	lips_match_ctor(&m);
 	mforeach(opt[OPT_s].value, it){
-		lipsMatch_s m;
 		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_s].value[it].str);
 		lips_vm_reset(&vm, &m, source);
-		
 		if( opt[OPT_d].set ){
 			lips_vm_debug(&vm);
 		}
 		else{
 			lips_vm_match(&vm);
 		}
-			
 		lips_dump_error(&m, vm.txt, stderr);
-		
 		if( opt[OPT_dump_capture].set ){
 			FILE* out = argfopen(opt[OPT_dump_capture].value[it].str, "w");
 			lips_dump_capture(&m, out);
@@ -115,6 +115,7 @@ int main(int argc, char** argv){
 	}
 	
 	lips_vm_dtor(&vm);
+	lips_match_dtor(&m);
 	lipsByc_dtor(&lbyc);
 	return 0;
 }

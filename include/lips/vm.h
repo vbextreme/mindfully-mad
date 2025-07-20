@@ -7,6 +7,7 @@
 typedef struct lipsError{
 	const utf8_t* loc;
 	uint8_t       number;
+	lipsAsl_s*    asl;
 }lipsError_s;
 
 typedef struct lipsMatch{
@@ -38,6 +39,8 @@ typedef struct lipsVM{
 
 lipsVM_s* lips_vm_ctor(lipsVM_s* vm, lipsByc_s* byc);
 void lips_vm_dtor(lipsVM_s* vm);
+lipsMatch_s* lips_match_ctor(lipsMatch_s* match);
+void lips_match_dtor(lipsMatch_s* match);
 void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt);
 int lips_vm_exec(lipsVM_s* vm);
 int lips_vm_match(lipsVM_s* vm);

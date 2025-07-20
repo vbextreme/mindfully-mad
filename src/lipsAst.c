@@ -19,7 +19,7 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node){
 				current->child[j].id = node[i].id;
 				current->child[j].sp = node[i].sp;
 				current->child[j].parent = current;
-				current->child[j].child  = MANY(lipsAst_s, 2);
+				current->child[j].child  = MANY(lipsAst_s, 1);
 				current = &current->child[j];
 			break;
 			case NOP_PARENT:
@@ -27,7 +27,6 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node){
 				current->len = node[i].sp - current->sp;
 				current = current->parent;
 			break;
-
 			case NOP_ENABLE:
 				iassert(disable);
 				--disable;
@@ -39,3 +38,15 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node){
 	return start;
 }
 
+__private void recast_dtor(lipsAst_s* node){
+	mforeach(node->child, i){
+		recast_dtor(&node->child[i]);
+	}
+	m_free(node->child);
+}
+
+void lips_ast_dtor(lipsAst_s* node){
+	if( !node ) return;
+	recast_dtor(node);
+	m_free(node);
+}

@@ -271,7 +271,7 @@ __private void draw_code(lipsVMDebug_s* d){
 __private void draw_step(lipsVMDebug_s* d){
 	term_surface_clear(d->header);
 	term_surface_focus(d->header);
-	printf("start:%04X ranges:%u functions:%u stacksize:%u", d->vm->byc->start, d->vm->byc->rangeCount, d->vm->byc->fnCount, d->stackLen);
+	printf("start:%04X ranges:%u functions:%u codesize: %X stacksize:%u", d->vm->byc->start, d->vm->byc->rangeCount, d->vm->byc->fnCount, d->vm->byc->codeLen, d->stackLen);
 	reverse_draw(d, d->stack, m_header(d->vm->stack)->len, revdraw_stack);
 	reverse_draw(d, d->cstack, m_header(d->vm->cstk)->len, revdraw_cstack);
 	reverse_draw(d, d->node, m_header(d->vm->node)->len, revdraw_node);
@@ -433,12 +433,10 @@ void lips_vm_debug(lipsVM_s* vm){
 	d.state      = DBG_STATE_BREAK;
 	d.brrm       = 0;
 	d.breakpoint = MANY(uint32_t, 16);
-
 	term_cls();
 	term_multi_surface_draw(&d.tms);
-	
 	do{
-		d.stackLen =  m_header(vm->stack)->len;
+		d.stackLen = m_header(vm->stack)->len;
 		d.curStack = d.stackLen ? d.stackLen - 1: 0;
 		d.curPC    = d.stackLen ? vm->stack[d.curStack].pc: 0;
 		draw_step(&d);
@@ -454,16 +452,16 @@ void lips_vm_debug(lipsVM_s* vm){
 			command_parse(&d);
 		}
 	}while( d.state != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
-	
 	term_cls();
 	term_flush();
 }
 
 void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
+	dbg_info("count: %u loc: %p", m->count, m->err.loc);
 	if( m->count < 0 ){
 		fprintf(f, "lips error: internal error, this never append for now\n");
 	}
-	else if( !m->count && m->err.number ){
+	else if( !m->count && m->err.loc ){
 		fprintf(f, "lips fail: %u\n", m->err.number);
 		const char*    sp    = (const char*)m->err.loc;
 		const unsigned len   = strlen((const char*)source);

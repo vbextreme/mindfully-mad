@@ -266,6 +266,21 @@ __private void* m_nullterm(void* mem){
 	return mem;
 }
 
+//copy if count = 0 copy all src in dst, all dst is reset, src and dst need same type
+__private void* m_copy(void* dst, void* src, unsigned count){
+	m_clear(dst);
+	const hmem_s* hsrc = m_header(src);
+	if( !count ){
+		count = hsrc->len;
+		if( !count ) return dst;
+	}
+	if( count > hsrc->len ) count = hsrc->len;
+	dst = m_grow(dst, count);
+	memcpy(dst, src, count * hsrc->sof);
+	m_header(dst)->len = count;
+	return dst;
+}
+
 __unsafe_end;
 
 #define mforeach(M,IT) for(unsigned IT = 0; IT < m_header(M)->len; ++IT)
