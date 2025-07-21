@@ -1,6 +1,6 @@
 @error[1] 'unknown symbol at this state';
-
-num       : /[0-9]+/;
+k;
+num       = /[0-9]+/;
 lnum      : num;
 rnum      : num;
 qtype     : /[\*\+\?]/;

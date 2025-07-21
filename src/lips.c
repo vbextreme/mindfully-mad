@@ -18,13 +18,13 @@ typedef enum{
 }options_e;
 
 option_s opt[] = {
-	{ 'g', "--grammar"      , "grammar file"                                           ,              OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ 's', "--source"       , "source file"                                            ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ 'd', "--debug"        , "debug"                                                  ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dump-capture" , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-file", "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-dot" , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
-	{ 'h', "--help"         , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
+	{ 'g', "--grammar"       , "grammar file"                                           ,              OPT_PATH | OPT_EXISTS, 0, NULL},
+	{ 's', "--source"        , "source file"                                            ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
+	{ 'd', "--debug"         , "debug"                                                  ,                          OPT_NOARG, 0, NULL},
+	{'\0', "--dump-capture"  , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-file" , "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-dot"  , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
+	{ 'h', "--help"          , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
 
 __private FILE* argfopen(const char* path, const char* mode){
@@ -102,19 +102,23 @@ int main(int argc, char** argv){
 			lips_dump_capture(&m, out);
 			argfclose(out);
 		}
-		if( opt[OPT_dump_ast_file].set ){
-			FILE* out = argfopen(opt[OPT_dump_ast_file].value[it].str, "w");
-			lips_dump_ast(&vm, out, 0);
-			argfclose(out);
-		}
-		if( opt[OPT_dump_ast_dot].set ){
-			FILE* out = argfopen(opt[OPT_dump_ast_dot].value[it].str, "w");
-			lips_dump_ast(&vm, out, 1);
-			argfclose(out);
+		
+		if( m.ast ){
+			if( opt[OPT_dump_ast_file].set ){
+				FILE* out = argfopen(opt[OPT_dump_ast_file].value[it].str, "w");
+				lips_dump_ast(&vm, out, 0);
+				argfclose(out);
+			}
+			if( opt[OPT_dump_ast_dot].set ){
+				FILE* out = argfopen(opt[OPT_dump_ast_dot].value[it].str, "w");
+				lips_dump_ast(&vm, out, 1);
+				argfclose(out);
+			}
+			//if( eid != -1 ) lips_ast_dtor(dump);
 		}
 	}
 	
-	lips_vm_dtor(&vm);
+	//lips_vm_dtor(&vm);
 	lips_match_dtor(&m);
 	lipsByc_dtor(&lbyc);
 	return 0;

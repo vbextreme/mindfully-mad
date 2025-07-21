@@ -141,8 +141,10 @@ void lips_match_dtor(lipsMatch_s* match){
 
 __private void lips_match_reset(lipsMatch_s* match){
 	memset(match->capture, 0, sizeof match->capture);
+	lips_ast_dtor(match->ast);
 	match->err.number = 0;
 	match->err.loc    = NULL;
+	match->err.last   = NULL;
 	match->ast        = NULL;
 	match->count      = 0;
 	m_clear(match->err.asl);
@@ -195,11 +197,10 @@ __private void op_ret(lipsVM_s* vm, int fail){
 	}
 }
 
-__private void op_error(lipsVM_s* vm, uint8_t num){
-	iassert(num < m_header(vm->byc->errStr)->len);
-	vm->match->err.loc    = vm->sp;
-	vm->match->err.number = num;
-	m_clear(vm->stack);
+__private void op_error(lipsVM_s* vm, __unused uint8_t num){
+	//iassert(num < m_header(vm->byc->errStr)->len);
+	vm->match->err.loc = NULL;
+	m_clear(vm->match->err.asl);
 }
 
 __private void op_node(lipsVM_s* vm, nodeOP_e op, unsigned id){
@@ -216,7 +217,6 @@ int lips_vm_exec(lipsVM_s* vm){
 		case OP_MATCH:
 			op_save(vm, 1);
 			vm->match->count = (vm->ls+1)/2;
-			if( m_header(vm->node)->len ) vm->match->ast = lips_ast_make(vm->node);
 		return 0;
 		
 		case OP_CHAR:
@@ -290,6 +290,7 @@ int lips_vm_exec(lipsVM_s* vm){
 				
 				case OPE_ERROR:
 					op_error(vm, BYTECODE_VAL08(byc));
+					stk_push(vm, vm->pc+1, vm->sp);
 				break;
 			}
 		break;
@@ -299,6 +300,12 @@ int lips_vm_exec(lipsVM_s* vm){
 
 int lips_vm_match(lipsVM_s* vm){
 	while( lips_vm_exec(vm) );
+	if( vm->match->count > 0 ){
+		vm->match->ast = lips_ast_make(vm->node, NULL);
+	}
+	else{
+		vm->match->ast = lips_ast_make(vm->match->err.asl, &vm->match->err.last);
+	}
 	return vm->match->count;
 }
 

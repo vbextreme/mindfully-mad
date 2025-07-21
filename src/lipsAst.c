@@ -1,6 +1,6 @@
 #include <lips/ast.h>
 
-lipsAst_s* lips_ast_make(lipsAsl_s* node){
+lipsAst_s* lips_ast_make(lipsAsl_s* node, lipsAst_s** last){
 	unsigned j;
 	lipsAst_s* start = NEW(lipsAst_s);
 	start->sp = 0;
@@ -35,7 +35,32 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node){
 			case NOP_DISABLE: ++disable; break;
 		}
 	}
+	if( last ) *last = current;
 	return start;
+}
+
+lipsAst_s* lips_ast_branch(lipsAst_s* node){
+	if( !node->parent ) return node;
+	unsigned i;
+	const unsigned n = m_header(node->parent)->len;
+	for( i=0; i < n; ++i ){
+		if( &node->parent->child[i] == node ) break;
+	}
+	iassert( i < n );
+	lipsAst_s* root = NEW(lipsAst_s);
+	memcpy(root, node, sizeof(lipsAst_s));
+	m_delete(node->parent, i, 1);
+	root->parent = NULL;
+	return root;
+}
+
+lipsAst_s* lips_ast_rev_root(lipsAst_s* last){
+	lipsAst_s* root = last->parent;
+	while( root ){
+		last = root;
+		root = last->parent;
+	}
+	return last;
 }
 
 __private void recast_dtor(lipsAst_s* node){

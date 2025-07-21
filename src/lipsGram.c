@@ -1,10 +1,10 @@
 #include <lips/ccompiler.h>
 /* breakpoint list
  * rx_altern fail
- *
 */
 /* 14E -> 123 regex -> 7A primary
-@error[1] 'unknown symbol at this state';
+
+
 
 num       : /[0-9]+/;
 lnum      : num;
@@ -55,7 +55,7 @@ builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
 rule_flags  : unstore? match?;
 rule_def    : skip word rule_flags skip rulestart;
 rule_group  : /\(/ skip rule_altern skip /\)/;
-rule_binerr : /\$\[/ num /\]/;
+rule_binerr : /@reset/;
 rule_primary: regex
             | rule_group
             | rule_binerr
@@ -74,10 +74,15 @@ grammar_end-@: skip  /\0/;
 grammar: regex
        | lips
        | grammar_end
-       | $[1]
        ;
 
-_start_: grammar+;
+_start_: (grammar $reset)+;
+
+@error[1] 'aspected char \':\', assign rule';
+@[1]>grammar>lips>rule>rule_def>word('k')
+                               &rule_flags>altro  >ciao
+                                          &esempio
+;
 
 */
 
@@ -436,14 +441,16 @@ __private void def_rule_group(lcc_s* lc){
 	}
 }
 
-//rule_binerr : /$\[/ num /\]/;
+//rule_binerr : /@reset/;
 __private void def_rule_binerr(lcc_s* lc){
 	INIT(lc);
 	FN("rule_binerr", 1){
-		CHAR('$');
-		CHAR('[');
-		CALL("num");
-		CHAR(']');
+		CHAR('@');
+		CHAR('r');
+		CHAR('e');
+		CHAR('s');
+		CHAR('e');
+		CHAR('t');
 	}
 }
 
@@ -536,7 +543,6 @@ __private void def_grammar_end(lcc_s* lc){
 //grammar: regex
 //       | lips
 //       | grammar_end
-//       | $[1]
 //       ;
 __private void def_grammar(lcc_s* lc){
 	INIT(lc);
@@ -559,7 +565,7 @@ __private void dec_error(lcc_s* lc){
 	ERRADD("unknown symbol at this state");
 }
 
-//_start_: grammar+;
+//_start_: (grammar $reset)+;
 uint16_t* lips_builtin_grammar_make(void){
 	CTOR();
 	INIT(ROBJ());
@@ -608,7 +614,10 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_grammar(ROBJ());
 	dec_error(ROBJ());
 	START(0);
-	OMQ(CALL("grammar"););
+	OMQ(
+		CALL("grammar");
+		ERROR(0);
+	);
 	uint16_t* ret;
 	MAKE(ret);
 	DTOR();

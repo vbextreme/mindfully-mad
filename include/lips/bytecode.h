@@ -78,7 +78,7 @@ typedef struct lipsByc{
 
 lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode);
 void lipsByc_dtor(lipsByc_s* byc);
-
+long lipsByc_name_toid(lipsByc_s* byc, const char* name);
 
 
 #endif

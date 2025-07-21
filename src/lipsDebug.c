@@ -454,6 +454,12 @@ void lips_vm_debug(lipsVM_s* vm){
 	}while( d.state != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
 	term_cls();
 	term_flush();
+	if( vm->match->count > 0 ){
+		vm->match->ast = lips_ast_make(vm->node, NULL);
+	}
+	else{
+		vm->match->ast = lips_ast_make(vm->match->err.asl, &vm->match->err.last);
+	}
 }
 
 void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
@@ -540,11 +546,13 @@ __private void ast_dump_dot(lipsAst_s* ast, const char** nmap, FILE* f){
 }
 
 void lips_dump_ast(lipsVM_s* vm, FILE* f, int mode){
-	if( !vm->match->ast ) return;
-	if( vm->match->count < 1 ) return;
+	lipsAst_s* root = vm->match->ast;
+	dbg_info("dump %p", root);
+	if( !root ) return;
+	if( vm->match->count < 0 ) return;
 	switch( mode ){
-		case 0: ast_dump_file(vm->match->ast, vm->byc->fnName, 0, f); break;
-		case 1: ast_dump_dot(vm->match->ast, vm->byc->fnName, f); break;
+		case 0: ast_dump_file(root, vm->byc->fnName, 0, f); break;
+		case 1: ast_dump_dot(root, vm->byc->fnName, f); break;
 	}
 	fflush(f);
 }

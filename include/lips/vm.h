@@ -8,6 +8,7 @@ typedef struct lipsError{
 	const utf8_t* loc;
 	uint8_t       number;
 	lipsAsl_s*    asl;
+	lipsAst_s*    last;
 }lipsError_s;
 
 typedef struct lipsMatch{

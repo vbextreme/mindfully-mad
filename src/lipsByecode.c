@@ -47,4 +47,15 @@ void lipsByc_dtor(lipsByc_s* byc){
 	m_free(byc->errStr);
 }
 
+long lipsByc_name_toid(lipsByc_s* byc, const char* name){
+	mforeach(byc->fnName, i){
+		if( !strcmp(byc->fnName[i], name) ) return i;
+	}
+	return -1;
+}
+
+
+
+
+
 
