@@ -4,9 +4,11 @@
 */
 /* 14E -> 123 regex -> 7A primary
 
+@error[1] 'aspected char \':\', declare new rule';
+@error[2] 'invalid number';
+@error[3] 'required ; at end of rule';
 
-
-num       : /[0-9]+/;
+num@[2]   : /[0-9]+/;
 lnum      : num;
 rnum      : num;
 qtype     : /[\*\+\?]/;
@@ -43,19 +45,19 @@ regex     : /\// rx_begin? rx_altern rx_end? /\//;
 
 sep-      : /[ \t\n]+/;
 skip-     : /[ \t\n]* /;
-rule_end- : skip /\;/;
+rule_end-@[3]: skip /\;/;
 unstore   : /-/;
-match     : /@/;
-rulestart : /:/;
+match     : /!/;
+rulestart@[1] : /:/;
 word      : /[a-zA-Z_][a-zA-Z_0-9]* /;
 quoted    : /'(?:[^\\']|\\.)*'/;
 
 builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
 
-rule_flags  : unstore? match?;
+rule_binerr : /@\[/ num /\]/;
+rule_flags  : unstore? match? rule_binerr?;
 rule_def    : skip word rule_flags skip rulestart;
 rule_group  : /\(/ skip rule_altern skip /\)/;
-rule_binerr : /@reset/;
 rule_primary: regex
             | rule_group
             | rule_binerr
@@ -70,28 +72,71 @@ lips: builtin_error
     | rule
     ;
 
-grammar_end-@: skip  /\0/;
+grammar_end-!: skip  /\0/;
 grammar: regex
        | lips
        | grammar_end
        ;
 
-_start_: (grammar $reset)+;
+_start_: (grammar @[0])+;
 
+
+
+
+
+
+
+TODO
+##comment
+#comment
+
+##error syntax
 @error[1] 'aspected char \':\', assign rule';
 @[1]>grammar>lips>rule>rule_def>word('k')
-                               &rule_flags>altro  >ciao
-                                          &esempio
+                               &rule_flags>altro>ciao<esempio>
 ;
 
-*/
+##semantic
+#+(name)  promote token to name and add to token list
+#=(name)  annotated name to token
+#&+(name) new scope name
+#&>(name) new child scope name
+#&<       new parent scope
+#&-       end scope
+#?(name)  if promoted name is in token list in current scope
+#?(name<) if promoted name is in token list in current or any parent scope
+#|(name)  elseif
+#|        else
 
-__private void token_class(lcc_s* lc, const char* fnname, const char* accept, unsigned rev, unsigned store, unsigned mode){
+#create global scope
+%[0] &+(global)
+
+#promote rule word to ruleName and push to definition token
+%[1] grammar>lips>rule>rule_def>word+(ruleName);
+
+if primary rule is word and is promoted to ruleName annotaded here to call
+#else raise error is not a function
+@error[2] 'rule is not declared'
+%[1] rule_primary>word?(ruleName)=(call)
+                      |@[2]
+;
+
+%[2] &-
+
+##emitter
+: > print on file
+: ! jitter
+: * binary write
+
+$[0]>rule_primary>~call: > call $word
+
+*/
+__private void token_class(lcc_s* lc, const char* fnname, const char* accept, unsigned rev, unsigned store, unsigned mode, unsigned err){
 	INIT(lc);
 	USERANGE();
 	RRSTR(accept, rev);
 	unsigned ir = RRADD();
-	FN(fnname, store){
+	FN(fnname, store, err){
 		switch( mode ){
 			case 0: RANGE(ir); break;
 			case 1: ZMQ(RANGE(ir);); break;
@@ -100,46 +145,46 @@ __private void token_class(lcc_s* lc, const char* fnname, const char* accept, un
 	}
 }
 
-__private void token_char(lcc_s* lc, const char* fnname, const char* accept, unsigned store){
+__private void token_char(lcc_s* lc, const char* fnname, const char* accept, unsigned store, unsigned err){
 	INIT(lc);
-	FN(fnname, store){
+	FN(fnname, store, err){
 		while( *accept ){
 			CHAR(*accept++);
 		}
 	}
 }
 
-__private void token_replace(lcc_s* lc, const char* org, const char* newname){
+__private void token_replace(lcc_s* lc, const char* org, const char* newname, unsigned err){
 	INIT(lc);
-	FN(newname, 1){
+	FN(newname, 1, err){
 		CALL(org);
 	}
 }
 
-//num       : /[0-9]+/;
+//num@[2]: /[0-9]+/;
 __private void def_num(lcc_s* lc){
-	token_class(lc, "num", "0123456789", 0, 1, 2);
+	token_class(lc, "num", "0123456789", 0, 1, 2, 2);
 }
 
 //lnum      : num;
 __private void def_lnum(lcc_s* lc){
-	token_replace(lc, "num", "lnum");
+	token_replace(lc, "num", "lnum", 0);
 }
 
 //lnum      : num;
 __private void def_rnum(lcc_s* lc){
-	token_replace(lc, "num", "rnum");
+	token_replace(lc, "num", "rnum", 0);
 }
 
 //qtype     : /[\*\+\?]/;
 __private void def_qtype(lcc_s* lc){
-	token_class(lc, "qtype", "*+?", 0, 1, 0);
+	token_class(lc, "qtype", "*+?", 0, 1, 0,  0);
 }
 
 //qspec     : /{/ lnum (/,/ rnum?)? /}/;
 __private void def_qspec(lcc_s* lc){
 	INIT(lc);
-	FN("qspec", 1){
+	FN("qspec", 1, 0){
 		CHAR('{');
 		CALL("lnum");
 		ZOQ(
@@ -155,7 +200,7 @@ __private void def_qspec(lcc_s* lc){
 //          ;
 __private void def_quantifier(lcc_s* lc){
 	INIT(lc);
-	FN("quantifier", 1){
+	FN("quantifier", 1, 0){
 		OR2(
 			CALL("qtype");
 		,
@@ -166,7 +211,7 @@ __private void def_quantifier(lcc_s* lc){
 
 //rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/];
 __private void def_rx_literal(lcc_s* lc){
-	token_class(lc, "rx_literal", "|*+?(){}[]./\\", 1, 1, 0);
+	token_class(lc, "rx_literal", "|*+?(){}[]./\\", 1, 1, 0, 0);
 }
 
 //rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
@@ -175,7 +220,7 @@ __private void def_rx_escaped(lcc_s* lc){
 	USERANGE();
 	RRSTR("|*+?(){}[].^$;\\0/tn", 0);
 	unsigned ir = RRADD();
-	FN("rx_escaped", 1){
+	FN("rx_escaped", 1, 0){
 		CHAR('\\');
 		RANGE(ir);
 	}
@@ -186,7 +231,7 @@ __private void def_rx_escaped(lcc_s* lc){
 //           ;
 __private void def_rx_char(lcc_s* lc){
 	INIT(lc);
-	FN("rx_char", 1){
+	FN("rx_char", 1, 0){
 		OR2(
 			CALL("rx_escaped");
 		,
@@ -198,7 +243,7 @@ __private void def_rx_char(lcc_s* lc){
 //rx_range   : rx_char ('-' rx_char)?;
 __private void def_rx_range(lcc_s* lc){
 	INIT(lc);
-	FN("rx_range", 1){
+	FN("rx_range", 1, 0){
 		CALL("rx_char");
 		ZOQ(
 			CHAR('-');
@@ -210,7 +255,7 @@ __private void def_rx_range(lcc_s* lc){
 //rx_class   : '[' rx_range+ ']';
 __private void def_rx_class(lcc_s* lc){
 	INIT(lc);
-	FN("rx_class", 1){
+	FN("rx_class", 1, 0){
 		CHAR('[');
 		OMQ(
 			CALL("rx_range");
@@ -221,23 +266,23 @@ __private void def_rx_class(lcc_s* lc){
 
 //rx_begin : /\^/;
 __private void def_rx_begin(lcc_s* lc){
-	token_char(lc, "rx_begin", "^", 1);
+	token_char(lc, "rx_begin", "^", 1, 0);
 }
 
 //rx_end   : /\$/;
 __private void def_rx_end(lcc_s* lc){
-	token_char(lc, "rx_end", "$", 1);
+	token_char(lc, "rx_end", "$", 1, 0);
 }
 
 //rx_any   : /./;
 __private void def_rx_any(lcc_s* lc){
-	token_char(lc, "rx_any", ".", 1);
+	token_char(lc, "rx_any", ".", 1, 0);
 }
 
 //rx_unnamed : /\(\?:/;
 __private void def_rx_unnamed(lcc_s* lc){
 	INIT(lc);
-	FN("rx_unnamed", 1){
+	FN("rx_unnamed", 1, 0){
 		CHAR('?');
 		CHAR(':');
 	}
@@ -246,7 +291,7 @@ __private void def_rx_unnamed(lcc_s* lc){
 //rx_group  : /\(/ rx_unnamed? rx_altern /\)/;
 __private void def_rx_group(lcc_s* lc){
 	INIT(lc);
-	FN("rx_group", 1){
+	FN("rx_group", 1, 0){
 		CHAR('(');
 		ZOQ(CALL("rx_unnamed"););
 		CALL("rx_altern");
@@ -262,7 +307,7 @@ __private void def_rx_group(lcc_s* lc){
 //          ;
 __private void def_rx_primary(lcc_s* lc){
 	INIT(lc);
-	FN("rx_primary", 1){
+	FN("rx_primary", 1, 0){
 		CHOOSE_BEGIN(5);
 			CALL("rx_literal");
 		CHOOSE();
@@ -280,7 +325,7 @@ __private void def_rx_primary(lcc_s* lc){
 //rx_repeat : rx_primary quantifier?;
 __private void def_rx_repeat(lcc_s* lc){
 	INIT(lc);
-	FN("rx_repeat", 1){
+	FN("rx_repeat", 1, 0){
 		CALL("rx_primary");
 		ZOQ(CALL("quantifier"););
 	}
@@ -289,7 +334,7 @@ __private void def_rx_repeat(lcc_s* lc){
 //rx_concat : rx_repeat+;
 __private void def_rx_concat(lcc_s* lc){
 	INIT(lc);
-	FN("rx_concat", 1){
+	FN("rx_concat", 1, 0){
 		OMQ(CALL("rx_repeat"););
 	}
 }
@@ -297,7 +342,7 @@ __private void def_rx_concat(lcc_s* lc){
 //rx_altern : rx_concat ( '|' rx_concat )*;
 __private void def_rx_altern(lcc_s* lc){
 	INIT(lc);
-	FN("rx_altern", 1){
+	FN("rx_altern", 1, 0){
 		CALL("rx_concat");
 		ZMQ(
 			CHAR('|');
@@ -309,7 +354,7 @@ __private void def_rx_altern(lcc_s* lc){
 //regex  : /\// rx_begin? rx_altern rx_end? /\//;
 __private void def_regex(lcc_s* lc){
 	INIT(lc);
-	FN("regex", 1){
+	FN("regex", 1, 0){
 		CHAR('/');
 		ZOQ(CALL("rx_begin"););
 		CALL("rx_altern");
@@ -320,18 +365,18 @@ __private void def_regex(lcc_s* lc){
 
 //sep-      : /[ \t\n]+/;
 __private void def_sep(lcc_s* lc){
-	token_class(lc, "sep", " \t\n", 0, 0, 2);
+	token_class(lc, "sep", " \t\n", 0, 0, 2, 0);
 }
 
 //skip-     : /[ \t\n]* /;
 __private void def_skip(lcc_s* lc){
-	token_class(lc, "skip", " \t\n", 0, 0, 1);
+	token_class(lc, "skip", " \t\n", 0, 0, 1, 0);
 }
 
-//rule_end- : skip /\;/;
+//rule_end-@[3]: skip /\;/;
 __private void def_rule_end(lcc_s* lc){
 	INIT(lc);
-	FN("rule_end", 0){
+	FN("rule_end", 0, 3){
 		CALL("skip");
 		CHAR(';');
 	}
@@ -339,17 +384,17 @@ __private void def_rule_end(lcc_s* lc){
 
 //unstore   : /-/;
 __private void def_unstore(lcc_s* lc){
-	token_char(lc, "unstore", "-", 1);
+	token_char(lc, "unstore", "-", 1, 0);
 }
 
-//match     : /@/;
+//match     : /!/;
 __private void def_match(lcc_s* lc){
-	token_char(lc, "match", "@", 1);
+	token_char(lc, "match", "!", 1, 0);
 }
 
-//rulestart : /:/;
+//rulestart@[1]: /:/;
 __private void def_rulestart(lcc_s* lc){
-	token_char(lc, "rulestart", ":", 1);
+	token_char(lc, "rulestart", ":", 1, 1);
 }
 
 //word      : /[a-zA-Z_][a-zA-Z_0-9]* /;
@@ -361,7 +406,7 @@ __private void def_word(lcc_s* lc){
 	RRANGE();
 	RRSTR("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789", 0);
 	unsigned rb = RRADD();
-	FN("word", 1){
+	FN("word", 1, 0){
 		RANGE(ra);
 		ZMQ(RANGE(rb););
 	}
@@ -375,7 +420,7 @@ __private void def_quoted(lcc_s* lc){
 	RRSET('\'');
 	RRREV();
 	unsigned nbl = RRADD();
-	FN("quoted", 1){
+	FN("quoted", 1, 0){
 		CHAR('\'');
 		ZMQ(
 			OR2(
@@ -392,7 +437,7 @@ __private void def_quoted(lcc_s* lc){
 //builtin_error: /@error\[/ num /\]/ sep quoted rule_end;
 __private void def_builtin_error(lcc_s* lc){
 	INIT(lc);
-	FN("builtin_error", 1){
+	FN("builtin_error", 1, 0){
 		CHAR('@');
 		CHAR('e');
 		CHAR('r');
@@ -408,19 +453,20 @@ __private void def_builtin_error(lcc_s* lc){
 	}
 }
 
-//rule_flags  : unstore? match?;
+//rule_flags  : unstore? match? rule_binerr?;
 __private void def_rule_flags(lcc_s* lc){
 	INIT(lc);
-	FN("rule_flags", 1){
+	FN("rule_flags", 1, 0){
 		ZOQ(CALL("unstore"););
 		ZOQ(CALL("match"););
+		ZOQ(CALL("rule_binerr"););
 	}
 }
 
 //rule_def    : skip word rule_flags skip rulestart;
 __private void def_rule_def(lcc_s* lc){
 	INIT(lc);
-	FN("rule_def", 1){
+	FN("rule_def", 1, 0){
 		CALL("skip");
 		CALL("word");
 		CALL("rule_flags");
@@ -432,7 +478,7 @@ __private void def_rule_def(lcc_s* lc){
 //rule_group  : /\(/ skip rule_altern skip /\)/;
 __private void def_rule_group(lcc_s* lc){
 	INIT(lc);
-	FN("rule_group", 1){
+	FN("rule_group", 1, 0){
 		CHAR('(');
 		CALL("skip");
 		CALL("rule_altern");
@@ -441,16 +487,14 @@ __private void def_rule_group(lcc_s* lc){
 	}
 }
 
-//rule_binerr : /@reset/;
+//rule_binerr : /@\[/ num /\]/;
 __private void def_rule_binerr(lcc_s* lc){
 	INIT(lc);
-	FN("rule_binerr", 1){
+	FN("rule_binerr", 1, 0){
 		CHAR('@');
-		CHAR('r');
-		CHAR('e');
-		CHAR('s');
-		CHAR('e');
-		CHAR('t');
+		CHAR('[');
+		CALL("num");
+		CHAR(']');
 	}
 }
 
@@ -461,7 +505,7 @@ __private void def_rule_binerr(lcc_s* lc){
 //            ;
 __private void def_rule_primary(lcc_s* lc){
 	INIT(lc);
-	FN("rule_primary", 1){
+	FN("rule_primary", 1, 0){
 		CHOOSE_BEGIN(4);
 		CALL("regex");
 		CHOOSE();
@@ -477,7 +521,7 @@ __private void def_rule_primary(lcc_s* lc){
 //rule_repeat : skip rule_primary quantifier?;
 __private void def_rule_repeat(lcc_s* lc){
 	INIT(lc);
-	FN("rule_repeat", 1){
+	FN("rule_repeat", 1, 0){
 		CALL("skip");
 		CALL("rule_primary");
 		ZOQ(CALL("quantifier"););
@@ -487,7 +531,7 @@ __private void def_rule_repeat(lcc_s* lc){
 //rule_concat : rule_repeat+ rule_end;
 __private void def_rule_concat(lcc_s* lc){
 	INIT(lc);
-	FN("rule_concat", 1){
+	FN("rule_concat", 1, 0){
 		OMQ(CALL("rule_repeat"););
 	}
 }
@@ -495,7 +539,7 @@ __private void def_rule_concat(lcc_s* lc){
 //rule_altern : rule_concat ( skip /|/ rule_concat )*;
 __private void def_rule_altern(lcc_s* lc){
 	INIT(lc);
-	FN("rule_altern", 1){
+	FN("rule_altern", 1, 0){
 		CALL("rule_concat");
 		ZMQ(
 			CALL("skip");
@@ -508,7 +552,7 @@ __private void def_rule_altern(lcc_s* lc){
 //rule        : rule_def skip rule_altern;
 __private void def_rule(lcc_s* lc){
 	INIT(lc);
-	FN("rule", 1){
+	FN("rule", 1, 0){
 		CALL("rule_def");
 		CALL("skip");
 		CALL("rule_altern");
@@ -521,7 +565,7 @@ __private void def_rule(lcc_s* lc){
 //    ;
 __private void def_lips(lcc_s* lc){
 	INIT(lc);
-	FN("lips", 1){
+	FN("lips", 1, 0){
 		OR2(
 			CALL("builtin_error");
 		,
@@ -533,7 +577,7 @@ __private void def_lips(lcc_s* lc){
 //grammar_end-@: skip /\0/;
 __private void def_grammar_end(lcc_s* lc){
 	INIT(lc);
-	FN("grammar_end", 0){
+	FN("grammar_end", 0, 0){
 		CALL("skip");
 		CHAR('\0');
 		MATCH();
@@ -546,23 +590,25 @@ __private void def_grammar_end(lcc_s* lc){
 //       ;
 __private void def_grammar(lcc_s* lc){
 	INIT(lc);
-	FN("grammar", 1){
+	FN("grammar", 1, 0){
 		CHOOSE_BEGIN(3);
 		CALL("regex");
 		CHOOSE();
 		CALL("lips");
 		CHOOSE();
 		CALL("grammar_end");
-		//CHOOSE();
-		//ERROR(1);
 		CHOOSE_END();
 	}
 }
 
-//@ERROR[1] 'unknown symbol at this state';
+//@error[1] 'aspected char \':\', declare new rule';
+//@error[2] 'invalid number';
+//@error[3] 'required ; at end of rule';
 __private void dec_error(lcc_s* lc){
 	INIT(lc);
-	ERRADD("unknown symbol at this state");
+	ERRADD("aspected \':\', declare new rule");
+	ERRADD("invalid number");
+	ERRADD("required ; at end of rule");
 }
 
 //_start_: (grammar $reset)+;

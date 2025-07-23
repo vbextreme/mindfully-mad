@@ -1,6 +1,8 @@
-@error[1] 'unknown symbol at this state';
+@error[1] 'aspected char \':\', declare new rule';
+@error[2] 'invalid number';
+@error[3] 'required ; at end of rule';
 
-num       : /[0-9]+/;
+num@[2]   : /[0-9]+/;
 lnum      : num;
 rnum      : num;
 qtype     : /[\*\+\?]/;
@@ -37,19 +39,20 @@ regex     : /\// rx_begin? rx_altern rx_end? /\//;
 
 sep-      : /[ \t\n]+/;
 skip-     : /[ \t\n]*/;
-rule_end- : skip /\;/;
+rule_end-@[3]: skip /\;/;
+
 unstore   : /-/;
-match     : /@/;
-rulestart : /:/;
+match     : /!/;
+rulestart@[1]: /:/;
 word      : /[a-zA-Z_][a-zA-Z_0-9]*/;
 quoted    : /'(?:[^\\']|\\.)*'/;
 
 builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
 
-rule_flags  : unstore? match?;
+rule_binerr : /@\[/ num /\]/;
+rule_flags  : unstore? match? rule_binerr?;
 rule_def    : skip word rule_flags skip rulestart;
 rule_group  : /\(/ skip rule_altern skip /\)/;
-rule_binerr : /@reset/;
 rule_primary: regex
             | rule_group
             | rule_binerr
@@ -64,11 +67,11 @@ lips: builtin_error
     | rule
     ;
 
-grammar_end-@: skip /\0/;
+grammar_end-!: skip /\0/;
 grammar: regex
        | lips
        | grammar_end
        ;
 
-_start_: (grammar @reset)+;
+_start_: (grammar @[0])+;
 

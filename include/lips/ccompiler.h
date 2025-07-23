@@ -76,7 +76,7 @@ lcc_s* lcc_node(lcc_s* rc, uint16_t id);
 lcc_s* lcc_nodeex(lcc_s* rc, nodeOP_e nop);
 long lcc_fn(lcc_s* rc, const char* name, unsigned len);
 lcc_s* lcc_ret(lcc_s* rc);
-int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store);
+int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error);
 int lcc_fn_epilog(lcc_s* rc, unsigned stored);
 int lcc_calli(lcc_s* rc, unsigned ifn);
 lcc_s* lcc_call(lcc_s* rc, const char* name, unsigned len);
@@ -115,7 +115,7 @@ void lcc_err_die(lcc_s* lc);
 #define PARENT()    do{ lcc_nodeex(_lcc, NOP_PARENT); }while(0)
 #define NDISABLE()  do{ lcc_nodeex(_lcc, NOP_DISABLE); }while(0)
 #define NENABLE()   do{ lcc_nodeex(_lcc, NOP_ENABLE); }while(0)
-#define FN(N, STRE) for( int _tmp = lcc_fn_prolog(_lcc, N, strlen(N), STRE); _tmp; _tmp = lcc_fn_epilog(_lcc, STRE) )
+#define FN(N, STRE,ERR) for( int _tmp = lcc_fn_prolog(_lcc, N, strlen(N), STRE, ERR); _tmp; _tmp = lcc_fn_epilog(_lcc, STRE) )
 #define CALLI(ID)   do{ lcc_calli(_lcc, ID); }while(0)
 #define CALL(N)     do{ lcc_call(_lcc, N, strlen(N)); }while(0)
 #define RET(ID)     do{ lcc_ret(_lcc); }while(0)

@@ -24,7 +24,7 @@
 #define LIPS_DBG_INP_W     LIPS_DBG_SCREEN_W
 
 void lips_vm_debug(lipsVM_s* vm);
-void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f);
+void lips_dump_error(lipsVM_s* vm, lipsMatch_s* m, const utf8_t* source, FILE* f);
 void lips_dump_capture(lipsMatch_s* m, FILE* f);
 void lips_dump_ast(lipsVM_s* vm, FILE* f, int mode);
 

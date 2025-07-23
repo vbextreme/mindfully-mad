@@ -74,7 +74,7 @@ int main(int argc, char** argv){
 		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_g].value->str);
 		lips_vm_reset(&vm, &m, source);
 		if( lips_vm_match(&vm) < 1 ){
-			lips_dump_error(&m, source, stderr);
+			lips_dump_error(&vm, &m, source, stderr);
 			die("");
 		}
 		die("TODO extract new grammar");
@@ -96,13 +96,13 @@ int main(int argc, char** argv){
 		else{
 			lips_vm_match(&vm);
 		}
-		lips_dump_error(&m, vm.txt, stderr);
+		lips_dump_error(&vm, &m, vm.txt, stderr);
 		if( opt[OPT_dump_capture].set ){
 			FILE* out = argfopen(opt[OPT_dump_capture].value[it].str, "w");
 			lips_dump_capture(&m, out);
 			argfclose(out);
 		}
-		
+	
 		if( m.ast ){
 			if( opt[OPT_dump_ast_file].set ){
 				FILE* out = argfopen(opt[OPT_dump_ast_file].value[it].str, "w");

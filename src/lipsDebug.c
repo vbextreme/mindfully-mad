@@ -271,7 +271,14 @@ __private void draw_code(lipsVMDebug_s* d){
 __private void draw_step(lipsVMDebug_s* d){
 	term_surface_clear(d->header);
 	term_surface_focus(d->header);
-	printf("start:%04X ranges:%u functions:%u codesize: %X stacksize:%u", d->vm->byc->start, d->vm->byc->rangeCount, d->vm->byc->fnCount, d->vm->byc->codeLen, d->stackLen);
+	printf("start:%04X ranges:%u functions:%u codesize: %X stacksize:%u rerr:%u", 
+			d->vm->byc->start,
+			d->vm->byc->rangeCount,
+			d->vm->byc->fnCount,
+			d->vm->byc->codeLen,
+			d->stackLen,
+			d->vm->rerr
+	);
 	reverse_draw(d, d->stack, m_header(d->vm->stack)->len, revdraw_stack);
 	reverse_draw(d, d->cstack, m_header(d->vm->cstk)->len, revdraw_cstack);
 	reverse_draw(d, d->node, m_header(d->vm->node)->len, revdraw_node);
@@ -454,21 +461,16 @@ void lips_vm_debug(lipsVM_s* vm){
 	}while( d.state != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
 	term_cls();
 	term_flush();
-	if( vm->match->count > 0 ){
-		vm->match->ast = lips_ast_make(vm->node, NULL);
-	}
-	else{
-		vm->match->ast = lips_ast_make(vm->match->err.asl, &vm->match->err.last);
-	}
+	if( m_header(vm->node)->len ) vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
 }
 
-void lips_dump_error(lipsMatch_s* m, const utf8_t* source, FILE* f){
+void lips_dump_error(lipsVM_s* vm, lipsMatch_s* m, const utf8_t* source, FILE* f){
 	dbg_info("count: %u loc: %p", m->count, m->err.loc);
 	if( m->count < 0 ){
 		fprintf(f, "lips error: internal error, this never append for now\n");
 	}
 	else if( !m->count && m->err.loc ){
-		fprintf(f, "lips fail: %u\n", m->err.number);
+		fprintf(f, "lips fail(%u) %s\n", m->err.number, vm->byc->errStr[m->err.number]);
 		const char*    sp    = (const char*)m->err.loc;
 		const unsigned len   = strlen((const char*)source);
 		const unsigned iline = count_line_to((const char*)source, sp);

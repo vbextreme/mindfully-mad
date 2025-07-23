@@ -221,9 +221,10 @@ lcc_s* lcc_ret(lcc_s* rc){
 	return rc;
 }
 
-int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store){
+int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error){
 	lcc_fn(rc, name, len);
 	if( store ) lcc_node(rc, rc->currentFN);
+	if( error ) lcc_error(rc, error);
 	return 1;
 }
 
@@ -415,7 +416,6 @@ uint16_t* lcc_make(lcc_s* rc){
 	//.section code
 	bc[BYC_SECTION_CODE] = inc - bc;
 	memcpy(inc, rc->bytecode, m_header(rc->bytecode)->len*sizeof(uint16_t));
-
 	return bc;
 }
 
