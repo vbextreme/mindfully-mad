@@ -97,8 +97,8 @@ sem_op@[17]    : sem_promote
                | sem_symbol
                | sem_query
                ;
-sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ skip;
-sem_altern     : word sem_op? sem_child*;
+sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ sem_op? skip;
+sem_altern     : skip word sem_op? sem_child*;
 sem_concat     : sem_altern+;
 sem_rule       : sem_concat;
 sem_stage      : /\[/ num /\]/;
@@ -134,8 +134,8 @@ TODO
 #?('VALUE'|...|@[]) node need value or other value or raise error
 
 
-@error[14] 'rule is not defined'
-@error[15] 'undefined error number'
+@error[14] 'rule is not defined';
+@error[15] 'undefined error number';
 
 %[0];
 %rule_def(word+ruleName);
@@ -666,7 +666,11 @@ __private void def_sem_query(lcc_s* lc){
 		CHAR('?');
 		CHAR('(');
 		CALL("query_type");
-		CALL("query_value");
+		ZMQ(
+			CHAR('|');
+			CALL("query_type");
+		);
+		CHAR(')');
 	}
 }
 
@@ -687,7 +691,7 @@ __private void def_sem_op(lcc_s* lc){
 	}
 }
 
-//sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ skip;
+//sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ sem_op? skip;
 __private void def_sem_child(lcc_s* lc){
 	INIT(lc);
 	FN("sem_child", 1, 18){
@@ -697,14 +701,16 @@ __private void def_sem_child(lcc_s* lc){
 		CALL("sem_concat");
 		CALL("skip");
 		CHAR(')');
+		ZOQ(CALL("sem_op"););
 		CALL("skip");
 	}
 }
 
-//sem_altern     : word sem_op? sem_child*;
+//sem_altern     : skip word sem_op? sem_child*;
 __private void def_sem_altern(lcc_s* lc){
 	INIT(lc);
 	FN("sem_altern", 1, 0){
+		CALL("skip");
 		CALL("word");
 		ZOQ(CALL("sem_op"););
 		ZOQ(CALL("sem_child"););
@@ -739,7 +745,7 @@ __private void def_semantic(lcc_s* lc){
 	INIT(lc);
 	FN("semantic", 1, 19){
 		CHAR('%');
-		OR2( CALL("num");, CALL("sem_rule"); );
+		OR2( CALL("sem_stage");, CALL("sem_rule"); );
 		CALL("rule_end");
 	}
 }

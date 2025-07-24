@@ -96,8 +96,8 @@ sem_op@[17]    : sem_promote
                | sem_symbol
                | sem_query
                ;
-sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ skip;
-sem_altern     : word sem_op? sem_child*;
+sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ sem_op? skip;
+sem_altern     : skip word sem_op? sem_child*;
 sem_concat     : sem_altern+;
 sem_rule       : sem_concat;
 sem_stage      : /\[/ num /\]/;
@@ -116,6 +116,18 @@ grammar: regex
        ;
 
 _start_: (skip grammar @[0])+;
+
+@error[20] 'rule is not defined';
+@error[21] 'undefined error number';
+
+%[0];
+%rule_def(word+ruleName);
+%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
+#%builtin_error(num+ErrNum);
+
+#%[1];
+#%rule_primary(word?(ruleName|@[20])>call);
+#%rule_binerr(num?(ErrNum|@[21]))
 
 
 

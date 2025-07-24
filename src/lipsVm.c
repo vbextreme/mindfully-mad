@@ -206,7 +206,7 @@ __private void op_error(lipsVM_s* vm, uint8_t num){
 
 __private void on_error(lipsVM_s* vm){
 	if( vm->sp >= vm->match->err.loc && vm->rerr ){
-		dbg_info("store error pos %lu num %u", vm->sp-vm->txt, vm->rerr);
+		//dbg_info("store error pos %lu num %u", vm->sp-vm->txt, vm->rerr);
 		vm->match->err.number = vm->rerr;
 		vm->match->err.loc    = vm->sp;
 	}
