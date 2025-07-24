@@ -88,7 +88,7 @@ grammar: regex
        | grammar_end
        ;
 
-_start_: (grammar @[0])+;
+_start_: (skip grammar @[0])+;
 
 
 
@@ -663,6 +663,7 @@ __private void dec_error(lcc_s* lc){
 uint16_t* lips_builtin_grammar_make(void){
 	CTOR();
 	INIT(ROBJ());
+	dec_error(ROBJ());
 	def_num(ROBJ());
 	def_lnum(ROBJ());
 	def_rnum(ROBJ());
@@ -707,9 +708,9 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_lips(ROBJ());
 	def_grammar_end(ROBJ());
 	def_grammar(ROBJ());
-	dec_error(ROBJ());
 	START(0);
 	OMQ(
+		CALL("skip");
 		CALL("grammar");
 		ERROR(0);
 	);
