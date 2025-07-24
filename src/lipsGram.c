@@ -91,6 +91,7 @@ query_node     : word;
 query_value    : quoted;
 query_type@[15]: query_node
                | query_value
+               | rule_binerr
                ;
 sem_query@[16] : /\?\(/ query_type ( /\|/ query_type )* /\)/;
 sem_op@[17]    : sem_promote
@@ -647,14 +648,17 @@ __private void def_query_value(lcc_s* lc){
 
 //query_type@[15]: query_node
 //               | query_value
+//               | rule_binerr
 //               ;
 __private void def_query_type(lcc_s* lc){
 	INIT(lc);
 	FN("query_type", 1, 15){
-		OR2(
+		OR3(
 			CALL("query_node");
 		,
 			CALL("query_value");
+		,
+			CALL("rule_binerr");
 		);
 	}
 }

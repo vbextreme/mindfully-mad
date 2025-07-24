@@ -90,6 +90,7 @@ query_node     : word;
 query_value    : quoted;
 query_type@[15]: query_node
                | query_value
+               | rule_binerr
                ;
 sem_query@[16] : /\?\(/ query_type ( /\|/ query_type )* /\)/;
 sem_op@[17]    : sem_promote
@@ -123,11 +124,11 @@ _start_: (skip grammar @[0])+;
 %[0];
 %rule_def(word+ruleName);
 %quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
-#%builtin_error(num+ErrNum);
+%builtin_error(num+ErrNum);
 
-#%[1];
-#%rule_primary(word?(ruleName|@[20])>call);
-#%rule_binerr(num?(ErrNum|@[21]))
+%[1];
+%rule_primary(word?(ruleName|@[20])>call);
+%rule_binerr(num?(ErrNum|@[21]))
 
 
 
