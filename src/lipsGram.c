@@ -51,6 +51,7 @@ rx_concat : rx_repeat+;
 rx_altern : rx_concat ( /\|/ rx_concat )*;
 regex@[10]: /\// rx_begin? rx_altern rx_end? /\//;
 
+comment-  : skip /#[^\n]*\n/;
 sep-      : /[ \t\n]+/;
 skip-     : /[ \t\n]* /;
 rule_end-@[3]: skip /\;/;
@@ -83,6 +84,7 @@ lips@[13]: builtin_error
 grammar_end-!: skip  /\0/;
 grammar: regex
        | lips
+       | comment
        | grammar_end
        ;
 
@@ -371,6 +373,21 @@ __private void def_regex(lcc_s* lc){
 	}
 }
 
+//comment-  : skip /#[^\n]*\n/;
+__private void def_comment(lcc_s* lc){
+	INIT(lc);
+	USERANGE();
+	RRSET('\n');
+	RRREV();
+	unsigned r = RRADD();
+	FN("comment", 1, 0){
+		CALL("skip");
+		CHAR('#');
+		ZMQ(RANGE(r););
+		CHAR('\n');
+	}
+}
+
 //sep-      : /[ \t\n]+/;
 __private void def_sep(lcc_s* lc){
 	token_class(lc, "sep", " \t\n", 0, 0, 2, 0);
@@ -594,15 +611,18 @@ __private void def_grammar_end(lcc_s* lc){
 
 //grammar: regex
 //       | lips
+//       | comment
 //       | grammar_end
 //       ;
 __private void def_grammar(lcc_s* lc){
 	INIT(lc);
 	FN("grammar", 1, 0){
-		CHOOSE_BEGIN(3);
+		CHOOSE_BEGIN(4);
 		CALL("regex");
 		CHOOSE();
 		CALL("lips");
+		CHOOSE();
+		CALL("comment");
 		CHOOSE();
 		CALL("grammar_end");
 		CHOOSE_END();
@@ -645,6 +665,7 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_rx_concat(ROBJ());
 	def_rx_altern(ROBJ());
 	def_regex(ROBJ());
+	def_comment(ROBJ());
 	def_sep(ROBJ());
 	def_skip(ROBJ());
 	def_rule_end(ROBJ());

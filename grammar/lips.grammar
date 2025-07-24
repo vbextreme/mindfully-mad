@@ -1,77 +1,94 @@
-@error[1] 'aspected char \':\', declare new rule';
-@error[2] 'invalid number';
-@error[3] 'required ; at end of rule';
+# LIPS GRAMMAR
+
+@error[1]  'aspected char \':\', declare new rule';
+@error[2]  'invalid number';
+@error[3]  'required ; at end of rule';
+@error[4]  'invalid quantifier'
+@error[5]  'invalid char'
+@error[6]  'invalid range'
+@error[7]  'invalid group'
+@error[8]  'invalid primary'
+@error[9]  'invalid quoted string'
+@error[10] 'invalid regex'
+@error[11] 'invalid rule flags'
+@error[12] 'invalid rule'
+@error[13] 'invalid lips'
+
 
 num@[2]   : /[0-9]+/;
 lnum      : num;
 rnum      : num;
 qtype     : /[\*\+\?]/;
 qspec     : /\{/ lnum (/,/ rnum?)? /\}/;
-quantifier: qtype
-          | qspec
-          ;
+quantifier@[4]: qtype
+              | qspec
+              ;
 
 rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
 rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
-rx_char    : rx_escaped
+rx_char@[5]: rx_escaped
            | rx_literal
            ;
 rx_range   : rx_char (/-/ rx_char)?;
-rx_class   : /\[/ rx_range+ /\]/;
+rx_class@[6]: /\[/ rx_range+ /\]/;
 
 rx_begin : /\^/;
 rx_end   : /\$/;
 rx_any   : /./;
 
 rx_unnamed: /\?:/;
-rx_group  : /\(/ rx_unnamed? rx_altern /\)/;
-rx_primary: rx_literal
-          | rx_escaped
-          | rx_group
-          | rx_class
-          | rx_any
-          ;
+rx_group@[7]: /\(/ rx_unnamed? rx_altern /\)/;
+rx_primary@[8]: rx_literal
+              | rx_escaped
+              | rx_group
+              | rx_class
+              | rx_any
+              ;
 
 rx_repeat : rx_primary quantifier?;
 rx_concat : rx_repeat+;
 rx_altern : rx_concat ( /\|/ rx_concat )*;
-regex     : /\// rx_begin? rx_altern rx_end? /\//;
+regex@[10]: /\// rx_begin? rx_altern rx_end? /\//;
 
+comment-  : skip /#[^\n]*\n/;
 sep-      : /[ \t\n]+/;
-skip-     : /[ \t\n]*/;
+skip-     : /[ \t\n]* /;
 rule_end-@[3]: skip /\;/;
-
 unstore   : /-/;
 match     : /!/;
-rulestart@[1]: /:/;
-word      : /[a-zA-Z_][a-zA-Z_0-9]*/;
-quoted    : /'(?:[^\\']|\\.)*'/;
+rulestart@[1] : /:/;
+word      : /[a-zA-Z_][a-zA-Z_0-9]* /;
+quoted@[9]: /'(?:[^\\']|\\.)*'/;
 
 builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
 
 rule_binerr : /@\[/ num /\]/;
-rule_flags  : unstore? match? rule_binerr?;
-rule_def    : skip word rule_flags skip rulestart;
-rule_group  : /\(/ skip rule_altern skip /\)/;
-rule_primary: regex
-            | rule_group
-            | rule_binerr
-            | word
-            ;
+rule_flags@[11]: unstore? match? rule_binerr?;
+rule_def       : skip word rule_flags skip rulestart;
+rule_group@[7]: /\(/ skip rule_altern skip /\)/;
+rule_primary@[8]: regex
+                | rule_group
+                | rule_binerr
+                | word
+                ;
 rule_repeat : skip rule_primary quantifier?;
 rule_concat : rule_repeat+;
-rule_altern : rule_concat ( skip /\|/ rule_concat )*;
-rule        : rule_def skip rule_altern rule_end;
+rule_altern : rule_concat ( skip /|/ rule_concat )*;
+rule@[12]   : rule_def skip rule_altern rule_end;
 
-lips: builtin_error
-    | rule
-    ;
+lips@[13]: builtin_error
+         | rule
+         ;
 
-grammar_end-!: skip /\0/;
+grammar_end-!: skip  /\0/;
 grammar: regex
        | lips
+       | comment
        | grammar_end
        ;
 
 _start_: (grammar @[0])+;
+
+
+
 
