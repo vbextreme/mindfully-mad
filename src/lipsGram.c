@@ -15,7 +15,6 @@
 @error[12] 'invalid rule'
 @error[13] 'invalid lips'
 
-
 num@[2]   : /[0-9]+/;
 lnum      : num;
 rnum      : num;
@@ -77,8 +76,37 @@ rule_concat : rule_repeat+;
 rule_altern : rule_concat ( skip /\|/ rule_concat )*;
 rule@[12]   : rule_def skip rule_altern rule_end;
 
+@error[14] 'aspected quoted value'
+@error[15] 'invalid query type'
+@error[16] 'invalid query'
+@error[17] 'invalid operation, aspected promotion, symbol or query'
+@error[18] 'invalid child'
+@errpr[19] 'invalid semantic'
+
+sem_value@[14] : /=/ quoted;
+sem_def        : word sem_value?;
+sem_promote    : />/ sem_def;
+sem_symbol     : /+/ sem_def;
+query_node     : word;
+query_value    : quoted;
+query_type@[15]: query_node
+               | query_value
+               ;
+sem_query@[16] : /?\(/ query_type ( /\|/ query_type )* /\)/
+sem_op@[17]    : sem_promote
+               | sem_symbol
+               | sem_query
+               ;
+sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ skip;
+sem_altern     : word sem_op? sem_child*;
+sem_concat     : sem_altern+
+sem_rule       : sem_concat;
+sem_stage      : /\[/ num /\]/;
+semantic@[19]  : /%/ ( sem_stage | sem_rule ) rule_end;
+
 lips@[13]: builtin_error
          | rule
+         | semantic
          ;
 
 grammar_end-!: skip  /\0/;
@@ -97,41 +125,27 @@ _start_: (skip grammar @[0])+;
 
 
 TODO
-##comment
-#comment
-
-##error syntax
-@error[1] 'aspected char \':\', assign rule';
-@[1]>grammar>lips>rule>rule_def>word('k')
-                               &rule_flags>altro>ciao<esempio>
-;
 
 ##semantic
-#+(name)  promote token to name and add to token list
-#=(name)  annotated name to token
-#&+(name) new scope name
-#&>(name) new child scope name
-#&<       new parent scope
-#&-       end scope
-#?(name)  if promoted name is in token list in current scope
-#?(name<) if promoted name is in token list in current or any parent scope
-#|(name)  elseif
-#|        else
+#%[N]               stage N
+#>NAME              change node id to NAME
+#>NAME='value'      same prev and change value
+#+                  same > but add to symbol list
+#?('VALUE'|...|@[]) node need value or other value or raise error
 
-#create global scope
-%[0] &+(global)
 
-#promote rule word to ruleName and push to definition token
-%[1] grammar>lips>rule>rule_def>word+(ruleName);
+@error[14] 'rule is not defined'
+@error[15] 'undefined error number'
 
-if primary rule is word and is promoted to ruleName annotaded here to call
-#else raise error is not a function
-@error[2] 'rule is not declared'
-%[1] rule_primary>word?(ruleName)=(call)
-                      |@[2]
-;
+%[0];
+%rule_def(word+ruleName);
+%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
+%builtin_error(num+ErrNum);
 
-%[2] &-
+%[1];
+%rule_primary(word?(ruleName|@[14])>call);
+%rule_binerr(num?(ErrNum|@[15]))
+
 
 ##emitter
 : > print on file
@@ -585,16 +599,164 @@ __private void def_rule(lcc_s* lc){
 	}
 }
 
+//sem_value@[14] : /=/ quoted;
+__private void def_sem_value(lcc_s* lc){
+	INIT(lc);
+	FN("sem_value", 1, 14){
+		CHAR('=');
+		CALL("quoted");
+	}
+}
+
+//sem_def        : word sem_value?;
+__private void def_sem_def(lcc_s* lc){
+	INIT(lc);
+	FN("sem_def", 1, 0){
+		CALL("word");
+		ZOQ(CALL("sem_value"););
+	}
+}
+
+//sem_promote    : />/ sem_def;
+__private void def_sem_promote(lcc_s* lc){
+	INIT(lc);
+	FN("sem_promote", 1, 0){
+		CHAR('>');
+		CALL("sem_def");
+	}
+}
+
+//sem_symbol     : /+/ sem_def;
+__private void def_sem_symbol(lcc_s* lc){
+	INIT(lc);
+	FN("sem_symbol", 1, 0){
+		CHAR('+');
+		CALL("sem_def");
+	}
+}
+
+//query_node     : word;
+__private void def_query_node(lcc_s* lc){
+	token_replace(lc, "word", "query_node", 0);
+}
+
+//query_value    : quoted;
+__private void def_query_value(lcc_s* lc){
+	token_replace(lc, "quoted", "query_value", 0);
+}
+
+//query_type@[15]: query_node
+//               | query_value
+//               ;
+__private void def_query_type(lcc_s* lc){
+	INIT(lc);
+	FN("query_type", 1, 15){
+		OR2(
+			CALL("query_node");
+		,
+			CALL("query_value");
+		);
+	}
+}
+
+//sem_query@[16] : /?\(/ query_type ( /\|/ query_type )* /\)/
+__private void def_sem_query(lcc_s* lc){
+	INIT(lc);
+	FN("query_type", 1, 16){
+		CHAR('?');
+		CHAR('(');
+		CALL("query_type");
+		CALL("query_value");
+	}
+}
+
+//sem_op@[17]    : sem_promote
+//               | sem_symbol
+//               | sem_query
+//               ;
+__private void def_sem_op(lcc_s* lc){
+	INIT(lc);
+	FN("sem_op", 1, 17){
+		CHOOSE_BEGIN(3);
+		CALL("sem_promote");
+		CHOOSE();
+		CALL("sem_symbol");
+		CHOOSE();
+		CALL("sem_query");
+		CHOOSE_END();
+	}
+}
+
+//sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ skip;
+__private void def_sem_child(lcc_s* lc){
+	INIT(lc);
+	FN("sem_child", 1, 18){
+		CALL("skip");
+		CHAR('(');
+		CALL("skip");
+		CALL("sem_concat");
+		CALL("skip");
+		CHAR(')');
+		CALL("skip");
+	}
+}
+
+//sem_altern     : word sem_op? sem_child*;
+__private void def_sem_altern(lcc_s* lc){
+	INIT(lc);
+	FN("sem_altern", 1, 0){
+		CALL("word");
+		ZOQ(CALL("sem_op"););
+		ZOQ(CALL("sem_child"););
+	}
+}
+
+//sem_concat     : sem_altern+
+__private void def_sem_concat(lcc_s* lc){
+	INIT(lc);
+	FN("sem_concat", 1, 0){
+		OMQ(CALL("sem_altern"););
+	}
+}
+
+//sem_rule       : sem_concat;
+__private void def_sem_rule(lcc_s* lc){
+	token_replace(lc, "sem_concat", "sem_rule", 0);
+}
+
+//sem_stage      : /\[/ num /\]/;
+__private void def_sem_stage(lcc_s* lc){
+	INIT(lc);
+	FN("sem_stage", 1, 0){
+		CHAR('[');
+		CALL("num");
+		CHAR(']');
+	}
+}
+
+//semantic@[19]  : /%/ ( sem_stage | sem_rule ) rule_end;
+__private void def_semantic(lcc_s* lc){
+	INIT(lc);
+	FN("semantic", 1, 19){
+		CHAR('%');
+		OR2( CALL("num");, CALL("sem_rule"); );
+		CALL("rule_end");
+	}
+}
+
 //lips@[13]: builtin_error
-//    | rule
-//    ;
+//         | rule
+//         | semantic
+//         ;
 __private void def_lips(lcc_s* lc){
 	INIT(lc);
 	FN("lips", 1, 13){
-		OR2(
+		OR3(
 			CALL("builtin_error");
 		,
 			CALL("rule");
+		,
+			CALL("semantic");
 		);
 	}
 }
@@ -642,6 +804,13 @@ __private void def_grammar(lcc_s* lc){
 //@error[11] 'invalid rule flags'
 //@error[12] 'invalid rule'
 //@error[13] 'invalid lips'
+//@error[14] 'aspected quoted value'
+//@error[15] 'invalid query type'
+//@error[16] 'invalid query'
+//@error[17] 'invalid operation, aspected promotion, symbol or query'
+//@error[18] 'invalid child'
+//@errpr[19] 'invalid semantic'
+
 __private void dec_error(lcc_s* lc){
 	INIT(lc);
 	ERRADD("aspected \':\', declare new rule");
@@ -657,6 +826,12 @@ __private void dec_error(lcc_s* lc){
 	ERRADD("invalid rule flags");
 	ERRADD("invalid rule");
 	ERRADD("invalid lips");
+	ERRADD("aspected quoted value");
+	ERRADD("invalid query type");
+	ERRADD("invalid query");
+	ERRADD("invalid operation, aspected promotion, symbol or query");
+	ERRADD("invalid child");
+	ERRADD("invalid semantic");
 }
 
 //_start_: (grammar $reset)+;
@@ -705,6 +880,21 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_rule_concat(ROBJ());
 	def_rule_altern(ROBJ());
 	def_rule(ROBJ());
+	def_sem_value(ROBJ());
+	def_sem_def(ROBJ());
+	def_sem_promote(ROBJ());
+	def_sem_symbol(ROBJ());
+	def_query_node(ROBJ());
+	def_query_value(ROBJ());
+	def_query_type(ROBJ());
+	def_sem_query(ROBJ());
+	def_sem_op(ROBJ());
+	def_sem_child(ROBJ());
+	def_sem_altern(ROBJ());
+	def_sem_concat(ROBJ());
+	def_sem_rule(ROBJ());
+	def_sem_stage(ROBJ());
+	def_semantic(ROBJ());
 	def_lips(ROBJ());
 	def_grammar_end(ROBJ());
 	def_grammar(ROBJ());
