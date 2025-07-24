@@ -629,14 +629,34 @@ __private void def_grammar(lcc_s* lc){
 	}
 }
 
-//@error[1] 'aspected char \':\', declare new rule';
-//@error[2] 'invalid number';
-//@error[3] 'required ; at end of rule';
+//@error[1]  'aspected char \':\', declare new rule';
+//@error[2]  'invalid number';
+//@error[3]  'required ; at end of rule';
+//@error[4]  'invalid quantifier'
+//@error[5]  'invalid char'
+//@error[6]  'invalid range'
+//@error[7]  'invalid group'
+//@error[8]  'invalid primary'
+//@error[9]  'invalid quoted string'
+//@error[10] 'invalid regex'
+//@error[11] 'invalid rule flags'
+//@error[12] 'invalid rule'
+//@error[13] 'invalid lips'
 __private void dec_error(lcc_s* lc){
 	INIT(lc);
 	ERRADD("aspected \':\', declare new rule");
 	ERRADD("invalid number");
 	ERRADD("required ; at end of rule");
+	ERRADD("invalid quantifier");
+	ERRADD("invalid char");
+	ERRADD("invalid range");
+	ERRADD("invalid group");
+	ERRADD("invalid primary");
+	ERRADD("invalid quoted string");
+	ERRADD("invalid regex");
+	ERRADD("invalid rule flags");
+	ERRADD("invalid rule");
+	ERRADD("invalid lips");
 }
 
 //_start_: (grammar $reset)+;
