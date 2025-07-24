@@ -74,7 +74,7 @@ rule_primary@[8]: regex
                 ;
 rule_repeat : skip rule_primary quantifier?;
 rule_concat : rule_repeat+;
-rule_altern : rule_concat ( skip /|/ rule_concat )*;
+rule_altern : rule_concat ( skip /\|/ rule_concat )*;
 rule@[12]   : rule_def skip rule_altern rule_end;
 
 lips@[13]: builtin_error
@@ -561,7 +561,7 @@ __private void def_rule_concat(lcc_s* lc){
 	}
 }
 
-//rule_altern : rule_concat ( skip /|/ rule_concat )*;
+//rule_altern : rule_concat ( skip /\|/ rule_concat )*;
 __private void def_rule_altern(lcc_s* lc){
 	INIT(lc);
 	FN("rule_altern", 1, 0){
