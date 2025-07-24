@@ -4,16 +4,16 @@
 @error[1]  'aspected char \':\', declare new rule';
 @error[2]  'invalid number';
 @error[3]  'required ; at end of rule';
-@error[4]  'invalid quantifier'
-@error[5]  'invalid char'
-@error[6]  'invalid range'
-@error[7]  'invalid group'
-@error[8]  'invalid primary'
-@error[9]  'invalid quoted string'
-@error[10] 'invalid regex'
-@error[11] 'invalid rule flags'
-@error[12] 'invalid rule'
-@error[13] 'invalid lips'
+@error[4]  'invalid quantifier';
+@error[5]  'invalid char';
+@error[6]  'invalid range';
+@error[7]  'invalid group';
+@error[8]  'invalid primary';
+@error[9]  'invalid quoted string';
+@error[10] 'invalid regex';
+@error[11] 'invalid rule flags';
+@error[12] 'invalid rule';
+@error[13] 'invalid lips';
 
 num@[2]   : /[0-9]+/;
 lnum      : num;
@@ -76,30 +76,30 @@ rule_concat : rule_repeat+;
 rule_altern : rule_concat ( skip /\|/ rule_concat )*;
 rule@[12]   : rule_def skip rule_altern rule_end;
 
-@error[14] 'aspected quoted value'
-@error[15] 'invalid query type'
-@error[16] 'invalid query'
-@error[17] 'invalid operation, aspected promotion, symbol or query'
-@error[18] 'invalid child'
-@errpr[19] 'invalid semantic'
+@error[14] 'aspected quoted value';
+@error[15] 'invalid query type';
+@error[16] 'invalid query';
+@error[17] 'invalid operation, aspected promotion, symbol or query';
+@error[18] 'invalid child';
+@error[19] 'invalid semantic';
 
 sem_value@[14] : /=/ quoted;
 sem_def        : word sem_value?;
 sem_promote    : />/ sem_def;
-sem_symbol     : /+/ sem_def;
+sem_symbol     : /\+/ sem_def;
 query_node     : word;
 query_value    : quoted;
 query_type@[15]: query_node
                | query_value
                ;
-sem_query@[16] : /?\(/ query_type ( /\|/ query_type )* /\)/
+sem_query@[16] : /\?\(/ query_type ( /\|/ query_type )* /\)/;
 sem_op@[17]    : sem_promote
                | sem_symbol
                | sem_query
                ;
 sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ skip;
 sem_altern     : word sem_op? sem_child*;
-sem_concat     : sem_altern+
+sem_concat     : sem_altern+;
 sem_rule       : sem_concat;
 sem_stage      : /\[/ num /\]/;
 semantic@[19]  : /%/ ( sem_stage | sem_rule ) rule_end;
@@ -659,10 +659,10 @@ __private void def_query_type(lcc_s* lc){
 	}
 }
 
-//sem_query@[16] : /?\(/ query_type ( /\|/ query_type )* /\)/
+//sem_query@[16] : /?\(/ query_type ( /\|/ query_type )* /\)/;
 __private void def_sem_query(lcc_s* lc){
 	INIT(lc);
-	FN("query_type", 1, 16){
+	FN("sem_query", 1, 16){
 		CHAR('?');
 		CHAR('(');
 		CALL("query_type");
