@@ -1,2 +1,3 @@
-%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
+%rule_primary(word?(ruleName|@[20])>call);
+
 

@@ -93,7 +93,7 @@ query_type@[15]: query_node
                | query_value
                | rule_binerr
                ;
-sem_query@[16] : /\?\(/ query_type ( /\|/ query_type )* /\)/;
+sem_query@[16] : /\?\(/ query_type ( /\|/ query_type )* /\)/ sem_op?;
 sem_op@[17]    : sem_promote
                | sem_symbol
                | sem_query
@@ -663,7 +663,7 @@ __private void def_query_type(lcc_s* lc){
 	}
 }
 
-//sem_query@[16] : /?\(/ query_type ( /\|/ query_type )* /\)/;
+//sem_query@[16] : /?\(/ query_type ( /\|/ query_type )* /\)/ sem_op?;
 __private void def_sem_query(lcc_s* lc){
 	INIT(lc);
 	FN("sem_query", 1, 16){
@@ -675,6 +675,7 @@ __private void def_sem_query(lcc_s* lc){
 			CALL("query_type");
 		);
 		CHAR(')');
+		ZOQ(CALL("sem_op"););
 	}
 }
 
