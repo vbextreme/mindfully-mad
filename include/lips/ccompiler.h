@@ -36,7 +36,8 @@ typedef enum {
 	LCC_ERR_FN_LONG,
 	LCC_ERR_FN_MANY,
 	LCC_ERR_FN_NOTEXISTS,
-	LCC_ERR_FN_UNDECLARED
+	LCC_ERR_FN_UNDECLARED,
+	LCC_ERR_ERR_OVERFLOW
 }lccerr_e;
 
 typedef struct lcc{
@@ -120,7 +121,7 @@ void lcc_err_die(lcc_s* lc);
 #define CALL(N)     do{ lcc_call(_lcc, N, strlen(N)); }while(0)
 #define RET(ID)     do{ lcc_ret(_lcc); }while(0)
 #define ERRADD(S)   ({ long r = lcc_error_add(_lcc, S, strlen(S)); if( r < 0 ) lcc_err_die(_lcc); r;})
-#define ERROR(N)    do{ lcc_error(_lcc, N); } while(0)
+#define ERROR(N)    do{ if( !lcc_error(_lcc, N) ) lcc_err_die(_lcc); } while(0)
 #define START(INC)  do{ lcc_start(_lcc, INC); }while(0)
 #define MAKE(SET)   do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
 

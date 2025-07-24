@@ -1,47 +1,55 @@
 #include <lips/ccompiler.h>
-/* breakpoint list
- * rx_altern fail
-*/
-/* 14E -> 123 regex -> 7A primary
+/*
 
-@error[1] 'aspected char \':\', declare new rule';
-@error[2] 'invalid number';
-@error[3] 'required ; at end of rule';
+@error[1]  'aspected char \':\', declare new rule';
+@error[2]  'invalid number';
+@error[3]  'required ; at end of rule';
+@error[4]  'invalid quantifier'
+@error[5]  'invalid char'
+@error[6]  'invalid range'
+@error[7]  'invalid group'
+@error[8]  'invalid primary'
+@error[9]  'invalid quoted string'
+@error[10] 'invalid regex'
+@error[11] 'invalid rule flags'
+@error[12] 'invalid rule'
+@error[13] 'invalid lips'
+
 
 num@[2]   : /[0-9]+/;
 lnum      : num;
 rnum      : num;
 qtype     : /[\*\+\?]/;
 qspec     : /\{/ lnum (/,/ rnum?)? /\}/;
-quantifier: qtype
-          | qspec
-          ;
+quantifier@[4]: qtype
+              | qspec
+              ;
 
 rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
 rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
-rx_char    : rx_escaped
+rx_char@[5]: rx_escaped
            | rx_literal
            ;
 rx_range   : rx_char (/-/ rx_char)?;
-rx_class   : /\[/ rx_range+ /\]/;
+rx_class@[6]: /\[/ rx_range+ /\]/;
 
 rx_begin : /\^/;
 rx_end   : /\$/;
 rx_any   : /./;
 
 rx_unnamed: /\?:/;
-rx_group  : /\(/ rx_unnamed? rx_altern /\)/;
-rx_primary: rx_literal
-          | rx_escaped
-          | rx_group
-          | rx_class
-          | rx_any
-          ;
+rx_group@[7]: /\(/ rx_unnamed? rx_altern /\)/;
+rx_primary@[8]: rx_literal
+              | rx_escaped
+              | rx_group
+              | rx_class
+              | rx_any
+              ;
 
 rx_repeat : rx_primary quantifier?;
 rx_concat : rx_repeat+;
 rx_altern : rx_concat ( /\|/ rx_concat )*;
-regex     : /\// rx_begin? rx_altern rx_end? /\//;
+regex@[10]: /\// rx_begin? rx_altern rx_end? /\//;
 
 sep-      : /[ \t\n]+/;
 skip-     : /[ \t\n]* /;
@@ -50,27 +58,27 @@ unstore   : /-/;
 match     : /!/;
 rulestart@[1] : /:/;
 word      : /[a-zA-Z_][a-zA-Z_0-9]* /;
-quoted    : /'(?:[^\\']|\\.)*'/;
+quoted@[9]: /'(?:[^\\']|\\.)*'/;
 
 builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
 
 rule_binerr : /@\[/ num /\]/;
-rule_flags  : unstore? match? rule_binerr?;
-rule_def    : skip word rule_flags skip rulestart;
-rule_group  : /\(/ skip rule_altern skip /\)/;
-rule_primary: regex
-            | rule_group
-            | rule_binerr
-            | word
-            ;
+rule_flags@[11]: unstore? match? rule_binerr?;
+rule_def       : skip word rule_flags skip rulestart;
+rule_group@[7]: /\(/ skip rule_altern skip /\)/;
+rule_primary@[8]: regex
+                | rule_group
+                | rule_binerr
+                | word
+                ;
 rule_repeat : skip rule_primary quantifier?;
 rule_concat : rule_repeat+;
 rule_altern : rule_concat ( skip /|/ rule_concat )*;
-rule        : rule_def skip rule_altern rule_end;
+rule@[12]   : rule_def skip rule_altern rule_end;
 
-lips: builtin_error
-    | rule
-    ;
+lips@[13]: builtin_error
+         | rule
+         ;
 
 grammar_end-!: skip  /\0/;
 grammar: regex
@@ -195,12 +203,12 @@ __private void def_qspec(lcc_s* lc){
 	}
 }
 
-//quantifier: qtype
+//quantifier@[4]: qtype
 //          | qspec
 //          ;
 __private void def_quantifier(lcc_s* lc){
 	INIT(lc);
-	FN("quantifier", 1, 0){
+	FN("quantifier", 1, 4){
 		OR2(
 			CALL("qtype");
 		,
@@ -226,12 +234,12 @@ __private void def_rx_escaped(lcc_s* lc){
 	}
 }
 
-//rx_char    : rx_escaped
+//rx_char@[5]: rx_escaped
 //           | rx_literal
 //           ;
 __private void def_rx_char(lcc_s* lc){
 	INIT(lc);
-	FN("rx_char", 1, 0){
+	FN("rx_char", 1, 5){
 		OR2(
 			CALL("rx_escaped");
 		,
@@ -252,10 +260,10 @@ __private void def_rx_range(lcc_s* lc){
 	}
 }
 
-//rx_class   : '[' rx_range+ ']';
+//rx_class@[6]: '[' rx_range+ ']';
 __private void def_rx_class(lcc_s* lc){
 	INIT(lc);
-	FN("rx_class", 1, 0){
+	FN("rx_class", 1, 6){
 		CHAR('[');
 		OMQ(
 			CALL("rx_range");
@@ -288,10 +296,10 @@ __private void def_rx_unnamed(lcc_s* lc){
 	}
 }
 
-//rx_group  : /\(/ rx_unnamed? rx_altern /\)/;
+//rx_group@[7]: /\(/ rx_unnamed? rx_altern /\)/;
 __private void def_rx_group(lcc_s* lc){
 	INIT(lc);
-	FN("rx_group", 1, 0){
+	FN("rx_group", 1, 7){
 		CHAR('(');
 		ZOQ(CALL("rx_unnamed"););
 		CALL("rx_altern");
@@ -299,15 +307,15 @@ __private void def_rx_group(lcc_s* lc){
 	}
 }
 
-//rx_primary: rx_literal
-//          | rx_escaped
-//          | rx_group
-//          | rx_class
-//          | rx_any
-//          ;
+//rx_primary@[8]: rx_literal
+//              | rx_escaped
+//              | rx_group
+//              | rx_class
+//              | rx_any
+//              ;
 __private void def_rx_primary(lcc_s* lc){
 	INIT(lc);
-	FN("rx_primary", 1, 0){
+	FN("rx_primary", 1, 8){
 		CHOOSE_BEGIN(5);
 			CALL("rx_literal");
 		CHOOSE();
@@ -351,10 +359,10 @@ __private void def_rx_altern(lcc_s* lc){
 	}
 }
 
-//regex  : /\// rx_begin? rx_altern rx_end? /\//;
+//regex@[10]: /\// rx_begin? rx_altern rx_end? /\//;
 __private void def_regex(lcc_s* lc){
 	INIT(lc);
-	FN("regex", 1, 0){
+	FN("regex", 1, 10){
 		CHAR('/');
 		ZOQ(CALL("rx_begin"););
 		CALL("rx_altern");
@@ -412,7 +420,7 @@ __private void def_word(lcc_s* lc){
 	}
 }
 
-//quoted    : /'(?:[^\\']|\\.)*'/;
+//quoted@[9]: /'(?:[^\\']|\\.)*'/;
 __private void def_quoted(lcc_s* lc){
 	INIT(lc);
 	USERANGE();
@@ -420,7 +428,7 @@ __private void def_quoted(lcc_s* lc){
 	RRSET('\'');
 	RRREV();
 	unsigned nbl = RRADD();
-	FN("quoted", 1, 0){
+	FN("quoted", 1, 9){
 		CHAR('\'');
 		ZMQ(
 			OR2(
@@ -453,10 +461,10 @@ __private void def_builtin_error(lcc_s* lc){
 	}
 }
 
-//rule_flags  : unstore? match? rule_binerr?;
+//rule_flags@[11]: unstore? match? rule_binerr?;
 __private void def_rule_flags(lcc_s* lc){
 	INIT(lc);
-	FN("rule_flags", 1, 0){
+	FN("rule_flags", 1, 11){
 		ZOQ(CALL("unstore"););
 		ZOQ(CALL("match"););
 		ZOQ(CALL("rule_binerr"););
@@ -475,10 +483,10 @@ __private void def_rule_def(lcc_s* lc){
 	}
 }
 
-//rule_group  : /\(/ skip rule_altern skip /\)/;
+//rule_group@[7]: /\(/ skip rule_altern skip /\)/;
 __private void def_rule_group(lcc_s* lc){
 	INIT(lc);
-	FN("rule_group", 1, 0){
+	FN("rule_group", 1, 7){
 		CHAR('(');
 		CALL("skip");
 		CALL("rule_altern");
@@ -549,10 +557,10 @@ __private void def_rule_altern(lcc_s* lc){
 	}
 }
 
-//rule        : rule_def skip rule_altern;
+//rule@[12]: rule_def skip rule_altern;
 __private void def_rule(lcc_s* lc){
 	INIT(lc);
-	FN("rule", 1, 0){
+	FN("rule", 1, 12){
 		CALL("rule_def");
 		CALL("skip");
 		CALL("rule_altern");
@@ -560,12 +568,12 @@ __private void def_rule(lcc_s* lc){
 	}
 }
 
-//lips: builtin_error
+//lips@[13]: builtin_error
 //    | rule
 //    ;
 __private void def_lips(lcc_s* lc){
 	INIT(lc);
-	FN("lips", 1, 0){
+	FN("lips", 1, 13){
 		OR2(
 			CALL("builtin_error");
 		,

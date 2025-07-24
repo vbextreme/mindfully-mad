@@ -224,7 +224,7 @@ lcc_s* lcc_ret(lcc_s* rc){
 int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error){
 	lcc_fn(rc, name, len);
 	if( store ) lcc_node(rc, rc->currentFN);
-	if( error ) lcc_error(rc, error);
+	if( error && !lcc_error(rc, error) ) lcc_err_die(rc);
 	return 1;
 }
 
@@ -267,6 +267,12 @@ long lcc_error_add(lcc_s* rc, const char* str, unsigned len){
 }
 
 lcc_s* lcc_error(lcc_s* rc, uint8_t num){
+	if( num >= m_header(rc->errstr)->len ){
+		rc->err     = LCC_ERR_ERR_OVERFLOW;
+		rc->errid   = num;
+		rc->erraddr = -1;
+		return NULL;
+	}
 	push_bytecode(rc, OP_EXT | OPE_ERROR | num);
 	return rc;
 }
