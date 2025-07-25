@@ -123,12 +123,63 @@ _start_: (skip grammar @[0])+;
 
 %[0];
 %rule_def(word+ruleName);
+#ENTER rule_def
+#ENTER word
+#TYPE  rulename
+
 %quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
+#ENTER quantifier
+#ENTER qspec
+#ENTER lnum
+#VALUE get '0'
+#LEAVE
+#ENTER rnum
+#TALUE '1'
+#LEAVE
+#TYPE  qtype
+#VALUE '1'
+
 %builtin_error(num+ErrNum);
 
 %[1];
 %rule_primary(word?(ruleName|@[20])>call);
 %rule_binerr(num?(ErrNum|@[21]));
+
+
+#1 rule_primary
+#2 word
+#3 ruleName
+#4 call
+#5 quantifier
+#6 qspec
+#7 lnum
+#8 rnum
+#9 qtype
+#    ENTER 1
+#    ENTER 2
+#    SPLIT L1
+#    TYPE  3
+#    JMP   L0
+#L1: ERROR 21
+#L0: DEC   4
+#    END
+#
+#ENTER 5
+#ENTER 6
+#ENTER 7
+#TESTV "0"
+#LEAVE
+#ENTER 8
+#TESTV "1"
+#LEAVE
+#TYPE 8
+#VALUE "?"
+#END
+
+
+
+
+
 
 
 

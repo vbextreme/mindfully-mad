@@ -74,7 +74,7 @@ lcc_s* lcc_splir(lcc_s* rc, unsigned lbl);
 lcc_s* lcc_jmp(lcc_s* rc, unsigned lbl);
 lcc_s* lcc_save(lcc_s* rc, uint8_t id);
 lcc_s* lcc_node(lcc_s* rc, uint16_t id);
-lcc_s* lcc_nodeex(lcc_s* rc, nodeOP_e nop);
+lcc_s* lcc_nodeex(lcc_s* rc, lipsOP_e nop);
 long lcc_fn(lcc_s* rc, const char* name, unsigned len);
 lcc_s* lcc_ret(lcc_s* rc);
 int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error);

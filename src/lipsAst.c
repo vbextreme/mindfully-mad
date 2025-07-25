@@ -13,7 +13,8 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node, lipsAst_s** last){
 	mforeach(node, i){
 		if( !current ) die("internall error, list node corrupted");
 		switch( node[i].op ){
-			case NOP_NEW:
+			default: die("internal error");
+			case OPEV_NODEEX_NEW:
 				if( disable ) break;
 				j = m_ipush(&current->child);
 				current->child[j].id = node[i].id;
@@ -22,17 +23,17 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node, lipsAst_s** last){
 				current->child[j].child  = MANY(lipsAst_s, 1);
 				current = &current->child[j];
 			break;
-			case NOP_PARENT:
+			case OPEV_NODEEX_PARENT:
 				if( disable ) break;
 				current->len = node[i].sp - current->sp;
 				current = current->parent;
 			break;
-			case NOP_ENABLE:
+			case OPEV_NODEEX_ENABLE:
 				iassert(disable);
 				--disable;
 			break;
 			
-			case NOP_DISABLE: ++disable; break;
+			case OPEV_NODEEX_DISABLE: ++disable; break;
 		}
 	}
 	if( last ) *last = current;

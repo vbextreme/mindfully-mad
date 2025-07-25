@@ -173,7 +173,7 @@ lcc_s* lcc_node(lcc_s* rc, uint16_t id){
 	return rc;
 }
 
-lcc_s* lcc_nodeex(lcc_s* rc, nodeOP_e nop){
+lcc_s* lcc_nodeex(lcc_s* rc, lipsOP_e nop){
 	push_bytecode(rc, OP_EXT | OPE_NODEEX | (nop&0xFF));
 	return rc;
 }
@@ -229,7 +229,7 @@ int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, uns
 }
 
 int lcc_fn_epilog(lcc_s* rc, unsigned stored){
-	if( stored ) lcc_nodeex(rc, NOP_PARENT);
+	if( stored ) lcc_nodeex(rc, OPEV_NODEEX_PARENT);
 	lcc_ret(rc);
 	return 0;
 }

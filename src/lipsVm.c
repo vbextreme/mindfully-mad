@@ -212,7 +212,7 @@ __private void on_error(lipsVM_s* vm){
 	}
 }
 
-__private void op_node(lipsVM_s* vm, nodeOP_e op, unsigned id){
+__private void op_node(lipsVM_s* vm, lipsOP_e op, unsigned id){
 	unsigned i = m_ipush(&vm->node);
 	vm->node[i].sp = vm->sp;
 	vm->node[i].id = id;
@@ -279,7 +279,7 @@ int lips_vm_exec(lipsVM_s* vm){
 		break;
 		
 		case OP_NODE:
-			op_node(vm, NOP_NEW, BYTECODE_VAL12(byc));
+			op_node(vm, OPEV_NODEEX_NEW, BYTECODE_VAL12(byc));
 			stk_push(vm, vm->pc+1, vm->sp);	
 		break;
 		
