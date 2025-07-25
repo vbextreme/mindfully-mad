@@ -11,6 +11,8 @@ lcc_s* lcc_ctor(lcc_s* rc){
 	rc->range    = MANY(lccrange_s, 16);
 	rc->urange   = MANY(lccurange_s, 16);
 	rc->errstr   = MANY(char*, 16);
+	rc->sfase    = MANY(lccSFase_s, 16);
+	rc->name     = MANY(char*, 16);
 	rc->err      = 0;
 	lccrange_s any;
 	lcc_range_ctor(&any);
@@ -34,6 +36,10 @@ void lcc_dtor(lcc_s* rc){
 	m_free(rc->call);
 	mforeach(rc->errstr, i) m_free(rc->errstr[i]);
 	m_free(rc->errstr);
+	mforeach(rc->sfase, i ) m_free(rc->sfase[i].addr);
+	m_free(rc->sfase);
+	mforeach(rc->name, i ) m_free(rc->name[i]);
+	m_free(rc->name);
 }
 
 __private unsigned push_bytecode(lcc_s* lc, uint16_t byc){
@@ -42,8 +48,30 @@ __private unsigned push_bytecode(lcc_s* lc, uint16_t byc){
 	return i;
 }
 
+__private long name_to_i(lcc_s* rc, const char* name){
+	mforeach(rc->fn, i){
+		if( !strcmp(rc->fn[i].name, name) ) return i;
+	}
+	mforeach(rc->name, i){
+		if( !strcmp(rc->name[i], name) ) return i + m_header(rc->fn)->len;
+	}
+	return -1;
+}
+
+unsigned lcc_push_name(lcc_s* rc, const char* name, unsigned len){
+	__free char* tmp = str_dup(name, len);
+	long ret = name_to_i(rc, tmp);
+	if( ret < 0 ){
+		unsigned i = m_ipush(&rc->name);
+		rc->name[i] = m_borrowed(tmp);
+		ret = i + m_header(rc->fn)->len;
+	}
+	return ret;
+}
+
 lcc_s* lcc_match(lcc_s* rc){
-	push_bytecode(rc, OP_MATCH);
+	push_bytecode(rc, OP_EXT | OPE_SAVE | 1);
+	push_bytecode(rc, OP_EXT | OPE_MATCH);
 	return rc;
 }
 
@@ -144,21 +172,21 @@ __private void label_resolve(lcc_s* rc, unsigned lbl, unsigned bc){
 
 lcc_s* lcc_split(lcc_s* rc, unsigned lbl){
 	label_resolve(rc, lbl,
-		push_bytecode(rc, OP_SPLITF)
+		push_bytecode(rc, OP_PUSH)
 	);
 	return rc;
 }
 
 lcc_s* lcc_splir(lcc_s* rc, unsigned lbl){
 	label_resolve(rc, lbl,
-		push_bytecode(rc, OP_SPLIRF)
+		push_bytecode(rc, OP_PUSHR)
 	);
 	return rc;
 }
 
 lcc_s* lcc_jmp(lcc_s* rc, unsigned lbl){
 	label_resolve(rc, lbl,
-		push_bytecode(rc, OP_JMPF)
+		push_bytecode(rc, OP_JMP)
 	);
 	return rc;
 }
@@ -294,11 +322,32 @@ lcc_s* lcc_start(lcc_s* rc, int search){
 	return rc;
 }
 
-__private long name_to_ifn(lcc_s* rc, const char* name){
-	mforeach(rc->fn, i){
-		if( !strcmp(rc->fn[i].name, name) ) return i;
+lcc_s* lcc_semantic_fase_new(lcc_s* rc){
+	unsigned i = m_ipush(&rc->sfase);
+	rc->sfase[i].addr = MANY(uint16_t, 16);
+	return rc;
+}
+
+lcc_s* lcc_semantic_rule_new(lcc_s* rc){
+	unsigned n = m_header(rc->sfase)->len;
+	iassert(n);
+	--n;
+	unsigned i = m_ipush(&rc->sfase[n].addr);
+	rc->sfase[n].addr[i] = m_header(rc->bytecode)->len;
+	return rc;
+}
+
+lcc_s* lcc_enter(lcc_s* rc, const char* name, unsigned len){
+	__free char* tmp = str_dup(name, len);
+	long n = name_to_i(rc, name);
+	if( n < 0 ){
+		rc->err     = LCC_ERR_UNKNOWN_NODE;
+		rc->errid   = len;
+		rc->erstr   = name;
+		return NULL;
 	}
-	return -1;
+	push_bytecode(rc, OP_ENTER | (n&0x0FFF));
+	return rc;
 }
 
 uint16_t* lcc_make(lcc_s* rc){
@@ -358,6 +407,13 @@ uint16_t* lcc_make(lcc_s* rc){
 		len /= 2;
 		inc += len;
 	}
+	mforeach(rc->name, i){
+		unsigned len = strlen(rc->name[i])+1;
+		memcpy(inc, rc->fn[i].name, len);
+		len = ROUND_UP(len, 2);
+		len /= 2;
+		inc += len;
+	}
 	//.section err
 	bc[BYC_SECTION_ERROR] = inc - bc;
 	mforeach(rc->errstr, i){
@@ -375,6 +431,15 @@ uint16_t* lcc_make(lcc_s* rc){
 	}
 	//.section urange
 	bc[BYC_SECTION_URANGE] = inc - bc;
+	//.section semantic
+	bc[BYC_SECTION_SEMANTIC] = inc-bc;
+	bc[BYC_SEMANTIC_COUNT] = m_header(rc->sfase)->len;
+	mforeach(rc->sfase, i){
+		*inc++ = m_header(rc->sfase[i].addr)->len;
+		mforeach(rc->sfase[i].addr, j){
+			*inc++ = rc->sfase[i].addr[j];
+		}
+	}
 	//linker
 	mforeach(rc->label, it){
 		if( rc->label[it].address == -1 ){
@@ -386,30 +451,21 @@ uint16_t* lcc_make(lcc_s* rc){
 		}
 		mforeach(rc->label[it].resolve, i){
 			const unsigned ba  = rc->label[it].resolve[i];
-			uint16_t byc = rc->bytecode[ba];
-			uint16_t off;
-			unsigned op = BYTECODE_CMD40(byc);
-			if( rc->label[it].address < ba ){
-				off = ba - rc->label[it].address;
-				op += 0x1000;
-			}
-			else{
-				off = rc->label[it].address - ba;
-			}
-
-			if( off > 4096 ){
+			const unsigned addr =  rc->label[it].address;
+			const uint16_t off = addr < ba ? ((ba-addr) | 0x0800): addr-ba;
+			if( (off & 0x07FF) > 2047 ){
 				rc->err     = LCC_ERR_JMP_LONG;
 				rc->errid   = it;
 				rc->erraddr = off;
 				m_free(bc);
 				return NULL;
 			}
-			rc->bytecode[ba] = op | off;
+			rc->bytecode[ba] |= off & 0x0FFF;
 		}
 	}
 	mforeach(rc->call, it){
-		long ifn = name_to_ifn(rc, rc->call[it].name);
-		if( ifn == -1 ){
+		long ifn = name_to_i(rc, rc->call[it].name);
+		if( ifn < 0 || ifn >= m_header(rc->fn)->len ){
 			dbg_info("not found function '%s'", rc->call[it].name);
 			rc->err     = LCC_ERR_FN_UNDECLARED;
 			rc->errid   = it;
@@ -431,7 +487,7 @@ const char* lcc_err_str(lcc_s* lc, char info[4096]){
 		case LCC_ERR_OK             : sprintf(info, "ok"); break;
 		case LCC_ERR_ERR_MANY       : sprintf(info, "declared too many error, > 256"); break;
 		case LCC_ERR_RANGE_MANY     : sprintf(info, "declared too many range, > 4096"); break;
-		case LCC_ERR_JMP_LONG       : sprintf(info, "label %lu long jump, address 0x%lX > 4096", lc->errid, lc->erraddr); break;
+		case LCC_ERR_JMP_LONG       : sprintf(info, "label %lu long jump, address 0x%lX > 0x%X", lc->errid, lc->erraddr, 2047); break;
 		case LCC_ERR_LBL_UNDECLARED : sprintf(info, "label %lu is not declared", lc->errid); break;
 		case LCC_ERR_LBL_LONG       : sprintf(info, "label start jump over %lu", lc->erraddr); break;
 		case LCC_ERR_FN_REDEFINITION: sprintf(info, "redefinition fn '%s'", lc->fn[lc->errid].name); break;
@@ -439,6 +495,8 @@ const char* lcc_err_str(lcc_s* lc, char info[4096]){
 		case LCC_ERR_FN_MANY        : sprintf(info, "declared too many fn, > 4096"); break;
 		case LCC_ERR_FN_NOTEXISTS   : sprintf(info, "fn %lu not exists", lc->errid); break;
 		case LCC_ERR_FN_UNDECLARED  : sprintf(info, "undeclared fn '%s'", lc->fn[lc->errid].name); break;
+		case LCC_ERR_ERR_OVERFLOW   : sprintf(info, "undeclared error %lu", lc->errid); break;
+		case LCC_ERR_UNKNOWN_NODE   : sprintf(info, "undeclared node '%.*s'", (int)lc->errid, lc->erstr); break;
 	}
 	return info;
 }

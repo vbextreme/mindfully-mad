@@ -32,11 +32,10 @@ typedef struct lipsVM{
 	lipsMatch_s*   match;
 	unsigned*      cstk;
 	lipsAsl_s*     node;
-	const utf8_t*  sp;
 	const utf8_t*  txt;
+	const utf8_t*  sp;
 	uint32_t       pc;
-	int            ls;
-	uint8_t        rerr;
+	uint8_t        er;
 }lipsVM_s;
 
 lipsVM_s* lips_vm_ctor(lipsVM_s* vm, lipsByc_s* byc);

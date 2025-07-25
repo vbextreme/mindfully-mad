@@ -25,6 +25,10 @@ typedef struct lccfn{
 	unsigned fail;
 }lccfn_s;
 
+typedef struct lccSFase{
+	uint16_t* addr;
+}lccSFase_s;
+
 typedef enum {
 	LCC_ERR_OK,
 	LCC_ERR_ERR_MANY,
@@ -37,26 +41,31 @@ typedef enum {
 	LCC_ERR_FN_MANY,
 	LCC_ERR_FN_NOTEXISTS,
 	LCC_ERR_FN_UNDECLARED,
-	LCC_ERR_ERR_OVERFLOW
+	LCC_ERR_ERR_OVERFLOW,
+	LCC_ERR_UNKNOWN_NODE
 }lccerr_e;
 
 typedef struct lcc{
 	uint16_t*    bytecode;
 	lccfn_s*     fn;
+	char**       name;
 	lccfn_s*     call;
 	lcclabel_s*  label;
 	lccrange_s*  range;
 	lccurange_s* urange;
+	lccSFase_s*  sfase;
 	char**       errstr;
 	unsigned     currentFN;
 	lccerr_e     err;
 	long         errid;
 	long         erraddr;
+	const char*  erstr;
 }lcc_s;
 
 
 lcc_s* lcc_ctor(lcc_s* rc);
 void lcc_dtor(lcc_s* rc);
+unsigned lcc_push_name(lcc_s* rc, const char* name, unsigned len);
 lcc_s* lcc_match(lcc_s* rc);
 lcc_s* lcc_char(lcc_s* rc, uint8_t val);
 lcc_s* lcc_utf8(lcc_s* rc, const utf8_t* val);
@@ -84,10 +93,12 @@ lcc_s* lcc_call(lcc_s* rc, const char* name, unsigned len);
 long lcc_error_add(lcc_s* rc, const char* str, unsigned len);
 lcc_s* lcc_error(lcc_s* rc, uint8_t num);
 lcc_s* lcc_start(lcc_s* rc, int search);
+lcc_s* lcc_semantic_fase_new(lcc_s* rc);
+lcc_s* lcc_semantic_rule_new(lcc_s* rc);
+lcc_s* lcc_enter(lcc_s* rc, const char* name, unsigned len);
 uint16_t* lcc_make(lcc_s* rc);
 const char* lcc_err_str(lcc_s* lc, char info[4096]);
 void lcc_err_die(lcc_s* lc);
-
 
 #define CTOR()      lcc_s _lccobj; lcc_ctor(&_lccobj)
 #define INIT(R)     lcc_s* _lcc = (R)
@@ -123,6 +134,9 @@ void lcc_err_die(lcc_s* lc);
 #define ERRADD(S)   ({ long r = lcc_error_add(_lcc, S, strlen(S)); if( r < 0 ) lcc_err_die(_lcc); r;})
 #define ERROR(N)    do{ if( !lcc_error(_lcc, N) ) lcc_err_die(_lcc); } while(0)
 #define START(INC)  do{ lcc_start(_lcc, INC); }while(0)
+#define SEMFASE()   do{ lcc_semantic_fase_new(_lcc); }while(0)
+#define SEMRULE()   do{ lcc_semantic_rule_new(_lcc); }while(0)
+#define ENTER(N)    do{ lcc_enter(_lcc, N, strlen(N)); }while(0)
 #define MAKE(SET)   do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
 
 #define OR2(CMDSA, CMDSB) do{\

@@ -32,7 +32,7 @@ typedef struct lipsVMDebug{
 	cmdInput_s         cinp;
 	unsigned           txtLen;
 	unsigned           curStack;
-	unsigned           curPC;
+//	unsigned           curPC;
 	unsigned           stackLen;
 	uint32_t*          breakpoint;
 	unsigned           brrm;
@@ -95,7 +95,7 @@ __private void reverse_draw(lipsVMDebug_s* d, termSurface_s* s, unsigned count, 
 }
 
 __private void revdraw_stack(lipsVMDebug_s* d, unsigned sc){
-	printf(" %% pc:%04X sp:%4lu ls:%3d",
+	printf(" %% pc:%04X tp:%4lu ls:%3d",
 		d->vm->stack[sc].pc,
 		d->vm->stack[sc].sp-d->vm->txt,
 		d->vm->stack[sc].ls
@@ -103,15 +103,15 @@ __private void revdraw_stack(lipsVMDebug_s* d, unsigned sc){
 }
 
 __private void revdraw_cstack(lipsVMDebug_s* d, unsigned sc){
-	printf(" <- pc:%4X", d->vm->cstk[sc]);
+	printf(" <- sp:%4X", d->vm->cstk[sc]);
 }
 
 __private void revdraw_node(lipsVMDebug_s* d, unsigned sc){
 	switch( d->vm->node[sc].op ){
-		case NOP_NEW    : printf(" + [%4u](%3d)%s len:%lu", sc, d->vm->node[sc].id, d->vm->byc->fnName[d->vm->node[sc].id], d->vm->node[sc].sp - d->vm->txt); break;
-		case NOP_PARENT : printf(" < [%4d] %lu", sc, d->vm->node[sc].sp - d->vm->txt); break;
-		case NOP_DISABLE: printf(" ~ [%4u]", sc); break;
-		case NOP_ENABLE : printf(" & [%4u]", sc); break;
+		case OPEV_NODEEX_NEW    : printf(" + [%4u](%3d)%s len:%lu", sc, d->vm->node[sc].id, d->vm->byc->fnName[d->vm->node[sc].id], d->vm->node[sc].sp - d->vm->txt); break;
+		case OPEV_NODEEX_PARENT : printf(" < [%4d] %lu", sc, d->vm->node[sc].sp - d->vm->txt); break;
+		case OPEV_NODEEX_DISABLE: printf(" ~ [%4u]", sc); break;
+		case OPEV_NODEEX_ENABLE : printf(" & [%4u]", sc); break;
 		default: printf(" INTERNAL ERROR ");
 	}
 }
@@ -157,8 +157,10 @@ __private void draw_range(lipsVMDebug_s* d, unsigned idrange, long ch){
 
 __private void draw_input(lipsVMDebug_s* d, int oncol){
 	term_surface_clear(d->input);
-	unsigned const ls = d->curStack;
-	unsigned offx = d->vm->stack[ls].sp - d->vm->txt;
+	//unsigned const ls = d->curStack;
+	//unsigned offx = d->vm->stack[ls].sp - d->vm->txt;
+	unsigned offx = d->vm->sp - d->vm->txt;
+
 	long low = offx;
 	low -= (d->input->w-2)/2;
 	if( low < 0 ) low = 0;
@@ -170,7 +172,8 @@ __private void draw_input(lipsVMDebug_s* d, int oncol){
 	}
 	term_gotoxy(d->input->x+1, d->input->y+1);
 	for( unsigned i = low; i < high; ++i ){
-		if( &d->vm->txt[i] == d->vm->stack[ls].sp ){
+//		if( &d->vm->txt[i] == d->vm->stack[ls].sp ){
+		if( &d->vm->txt[i] == d->vm->sp ){
 			switch( oncol ){
 				case 0: term_fcol(160); break;
 				case 1: term_fcol(46); break;
@@ -198,38 +201,37 @@ __private void draw_opcode(lipsVMDebug_s* d, unsigned pc){
 		default : printf("INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
 		case OP_RANGE :
 			printf("range %u", BYTECODE_VAL12(byc));
-			if( d->curPC == pc ){
+//			if( d->curPC == pc ){
+			if( d->vm->pc == pc ){
 				term_reset();
 				draw_range(d, BYTECODE_VAL12(byc), *d->vm->stack[d->curStack].sp);
 				draw_input(d, !!lips_range_test(d->vm, BYTECODE_VAL12(byc), *d->vm->stack[d->curStack].sp));
 			}
 		break;
 		case OP_URANGE: break;
-		case OP_MATCH :  fputs("match", stdout); break;
 		case OP_CHAR  :
 			fputs("char  ", stdout); fputs(cast_view_char(BYTECODE_VAL08(byc),1), stdout);
-			if( d->curPC == pc ){
+//			if( d->curPC == pc ){
+			if( d->vm->pc == pc ){
 				term_reset();
 				draw_input(d, BYTECODE_VAL08(byc) == *d->vm->stack[d->curStack].sp);
 			}
 		break;
-		case OP_SPLITF: printf("split %X", pc + BYTECODE_VAL12(byc)); break;
-		case OP_SPLITB: printf("split %X", pc - BYTECODE_VAL12(byc)); break;
-		case OP_SPLIRF: printf("splir %X", pc + BYTECODE_VAL12(byc)); break;
-		case OP_SPLIRB: printf("splir %X", pc - BYTECODE_VAL12(byc)); break;
-		case OP_JMPF  : printf("jmp   %X", pc + BYTECODE_VAL12(byc)); break;
-		case OP_JMPB  : printf("jmp   %X", pc - BYTECODE_VAL12(byc)); break;
+		case OP_PUSH  : printf("push  %X -> pc %X", pc + BYTECODE_IVAL11(byc), pc+1); break;
+		case OP_PUSHR : printf("push  %X -> pc %X", pc + 1, pc + BYTECODE_IVAL11(byc)); break;
+		case OP_JMP   : printf("jmp   %X", pc + BYTECODE_IVAL11(byc)); break;
 		case OP_NODE  : printf("node  new::%s::%u", d->vm->byc->fnName[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
 		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), d->vm->byc->fnName[BYTECODE_VAL12(byc)], d->vm->byc->fn[BYTECODE_VAL12(byc)]); break;
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
+				case OPE_MATCH : printf("match %u", BYTECODE_VAL08(byc)); break;
 				case OPE_SAVE  : printf("save  %u", BYTECODE_VAL08(byc)); break;
 				case OPE_RET   : printf("ret   %u", BYTECODE_VAL08(byc)); break;
 				case OPE_NODEEX:
 					switch( BYTECODE_VAL08(byc) ){
-						case NOP_PARENT : printf("node  parent"); break;
-						case NOP_DISABLE: printf("node  disable"); break;
-						case NOP_ENABLE : printf("node  enable"); break;
+						case OPEV_NODEEX_PARENT : printf("node  parent"); break;
+						case OPEV_NODEEX_DISABLE: printf("node  disable"); break;
+						case OPEV_NODEEX_ENABLE : printf("node  enable"); break;
 					}
 				break;
 				case OPE_ERROR: printf("error %u", BYTECODE_VAL08(byc)); break;
@@ -243,7 +245,7 @@ __private void draw_code(lipsVMDebug_s* d){
 	unsigned const count = d->vm->byc->codeLen;
 	unsigned const csel  = 63;
 	term_surface_clear(d->code);
-	long low  = d->curPC;
+	long low  = d->vm->pc;//d->curPC;
    	low -= (d->code->h-2)/2;
 	if( low < 0 ) low = 0;
 	unsigned high = low + d->code->h-2;
@@ -255,7 +257,8 @@ __private void draw_code(lipsVMDebug_s* d){
 	unsigned y = d->code->y+1;
 	for(unsigned i = low; i < high; ++i ){
 		term_gotoxy(d->code->x+1, y++);
-		if( d->curPC == i ){
+		//if( d->curPC == i ){
+		if( d->vm->pc == i ){
 			term_fcol(csel);
 			printf(">");
 		}
@@ -277,18 +280,18 @@ __private void draw_step(lipsVMDebug_s* d){
 			d->vm->byc->fnCount,
 			d->vm->byc->codeLen,
 			d->stackLen,
-			d->vm->rerr
+			d->vm->er
 	);
 	reverse_draw(d, d->stack, m_header(d->vm->stack)->len, revdraw_stack);
 	reverse_draw(d, d->cstack, m_header(d->vm->cstk)->len, revdraw_cstack);
 	reverse_draw(d, d->node, m_header(d->vm->node)->len, revdraw_node);
-	reverse_draw(d, d->save, d->vm->ls+1, revdraw_save);
+	reverse_draw(d, d->save, d->vm->match->count+1, revdraw_save);
 	reverse_draw(d, d->brk, m_header(d->breakpoint)->len, revdraw_breakpoint);
 	term_surface_clear(d->range);
-	if( d->stackLen ){
+	//if( d->stackLen ){
 		draw_input(d, -1);
 		draw_code(d);
-	}
+	//}
 	term_flush();
 }
 
@@ -445,9 +448,10 @@ void lips_vm_debug(lipsVM_s* vm){
 	do{
 		d.stackLen = m_header(vm->stack)->len;
 		d.curStack = d.stackLen ? d.stackLen - 1: 0;
-		d.curPC    = d.stackLen ? vm->stack[d.curStack].pc: 0;
+		//d.curPC    = d.stackLen ? vm->stack[d.curStack].pc: 0;
 		draw_step(&d);
-		if( breakpoint_find(&d, d.curPC) != -1 ) d.state = DBG_STATE_BREAK;
+//		if( breakpoint_find(&d, d.curPC) != -1 ) d.state = DBG_STATE_BREAK;
+		if( breakpoint_find(&d, d.vm->pc) != -1 ) d.state = DBG_STATE_BREAK;
 		if( d.state == DBG_STATE_STEP ) d.state = DBG_STATE_BREAK;
 		while( d.state == DBG_STATE_BREAK ){
 			if( d.brrm ){

@@ -73,12 +73,12 @@ CALL FN; push pc+1
 MATCH
 */
 
-__private void stk_push(lipsVM_s* vm, unsigned pc, const utf8_t* sp){
+__private void stk_push(lipsVM_s* vm, unsigned pc){
 	if( pc >= vm->byc->codeLen ) return;
 	unsigned i = m_ipush(&vm->stack);
 	vm->stack[i].pc = pc;
-	vm->stack[i].sp = sp;
-	vm->stack[i].ls = vm->ls;
+	vm->stack[i].sp = vm->sp;
+	vm->stack[i].ls = vm->match->count;
 	vm->stack[i].cp = m_header(vm->cstk)->len;
 	vm->stack[i].np = m_header(vm->node)->len;
 }
@@ -88,28 +88,17 @@ __private int stk_pop(lipsVM_s* vm){
 	if( i < 0 ) return 0;
 	vm->pc = vm->stack[i].pc;
 	vm->sp = vm->stack[i].sp;
-	vm->ls = vm->stack[i].ls;
+	vm->match->count = vm->stack[i].ls;
 	m_header(vm->cstk)->len = vm->stack[i].cp;
 	m_header(vm->node)->len = vm->stack[i].np;
 	return 1;
 }
 
-__private void stk_return_call_success(lipsVM_s* vm, unsigned pos){
-	iassert(pos>0);
-	vm->stack[pos-1].sp = vm->sp;
-	vm->stack[pos-1].ls = vm->ls;
-	vm->stack[pos-1].np = m_header(vm->node)->len;
-	m_header(vm->stack)->len = pos;
-}
-
-__private void stk_return_call_fail(lipsVM_s* vm, unsigned pos){
-	iassert(pos>0);
-	if( pos ){
-		m_header(vm->stack)->len = pos-1;
-	}
-	else{
-		m_header(vm->stack)->len = 0;
-	}
+__private int stk_pop_pc(lipsVM_s* vm){
+	long i = m_ipop(vm->stack);
+	if( i < 0 ) return 0;
+	vm->pc = vm->stack[i].pc;
+	return 1;
 }
 
 lipsVM_s* lips_vm_ctor(lipsVM_s* vm, lipsByc_s* byc){
@@ -153,11 +142,11 @@ void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt){
 	m_clear(vm->cstk);
 	m_clear(vm->node);
 	if( txt ) vm->txt = txt;
-	vm->ls = -1;
 	vm->match = match;
-	vm->rerr  = 0;
 	lips_match_reset(vm->match);
-	stk_push(vm, vm->byc->start, txt);
+	vm->er = 0;
+	vm->pc = vm->byc->start;
+	vm->sp = txt;
 }
 
 __private int op_range(lipsVM_s* vm, unsigned ir, utf8_t ch){
@@ -169,26 +158,30 @@ __private int op_range(lipsVM_s* vm, unsigned ir, utf8_t ch){
 __private void op_save(lipsVM_s* vm, unsigned id){
 	iassert(id < 256);
 	vm->match->capture[id] = vm->sp;
-	if( (int)id > vm->ls ) vm->ls = id;
+	if( (int)id > vm->match->count ) vm->match->count = id;
 }
 
 __private void op_call(lipsVM_s* vm, unsigned ifn){
-	stk_push(vm, vm->pc+1, vm->sp);
+	stk_push(vm, vm->pc+1);
 	unsigned i = m_ipush(&vm->cstk);
 	vm->cstk[i] = m_header(vm->stack)->len;
-	stk_push(vm, vm->byc->fn[ifn], vm->sp);
+	vm->pc = vm->byc->fn[ifn];
 }
 
-__private void op_ret(lipsVM_s* vm, int fail){
+__private int op_ret(lipsVM_s* vm, int fail){
 	long i = m_ipop(vm->cstk);
-	if( i >=0 ){
+	if( i >= 0 ){
 		if( fail ){
-			stk_return_call_fail(vm, vm->cstk[i]);
+			iassert( vm->cstk[i] );
+			m_header(vm->stack)->len = vm->cstk[i]-1;
+			return stk_pop(vm);
 		}
 		else{
-			stk_return_call_success(vm, vm->cstk[i]);
+			m_header(vm->stack)->len = vm->cstk[i];
+			return stk_pop_pc(vm);
 		}
 	}
+	return 0;
 }
 
 __private void op_error(lipsVM_s* vm, uint8_t num){
@@ -196,18 +189,18 @@ __private void op_error(lipsVM_s* vm, uint8_t num){
 	if( !num ){
 		vm->match->err.loc = NULL;
 		vm->match->err.number = 0;
-		vm->rerr = 0;
+		vm->er = 0;
 	}
 	else{
 		//dbg_info("set err %u", num);
-		vm->rerr = num;
+		vm->er = num;
 	}
 }
 
 __private void on_error(lipsVM_s* vm){
-	if( vm->sp >= vm->match->err.loc && vm->rerr ){
+	if( vm->sp >= vm->match->err.loc && vm->er ){
 		//dbg_info("store error pos %lu num %u", vm->sp-vm->txt, vm->rerr);
-		vm->match->err.number = vm->rerr;
+		vm->match->err.number = vm->er;
 		vm->match->err.loc    = vm->sp;
 	}
 }
@@ -220,29 +213,25 @@ __private void op_node(lipsVM_s* vm, lipsOP_e op, unsigned id){
 }
 
 int lips_vm_exec(lipsVM_s* vm){
-	if( !stk_pop(vm) ) return 0;
 	const unsigned byc = vm->byc->code[vm->pc];
 	switch( BYTECODE_CMD40(byc) ){
-		case OP_MATCH:
-			op_save(vm, 1);
-			vm->match->count = (vm->ls+1)/2;
-		return 0;
-		
 		case OP_CHAR:
 			if( *vm->sp == BYTECODE_VAL08(byc) ){
-				stk_push(vm, vm->pc+1, vm->sp+1);
+				++vm->sp;
 			}
 			else{
 				on_error(vm);
+				return stk_pop(vm);
 			}
 		break;
 		
 		case OP_RANGE:
 			if( op_range(vm, BYTECODE_VAL12(byc), *vm->sp) ){
-				stk_push(vm, vm->pc+1, vm->sp+1);
+				++vm->sp;
 			}
 			else{
 				on_error(vm);
+				return stk_pop(vm);
 			}
 		break;
 		
@@ -250,71 +239,56 @@ int lips_vm_exec(lipsVM_s* vm){
 			//TODO
 		break;
 		
-		case OP_SPLITF:
-			stk_push(vm, vm->pc + BYTECODE_VAL12(byc), vm->sp);
-			stk_push(vm, vm->pc+1, vm->sp);
+		case OP_PUSH:
+			stk_push(vm, vm->pc + BYTECODE_IVAL11(byc));
 		break;
+	
+		case OP_PUSHR:
+			stk_push(vm, vm->pc + 1);
+			vm->pc += BYTECODE_IVAL11(byc);
+		return 1;
 		
-		case OP_SPLITB:
-			stk_push(vm, vm->pc - BYTECODE_VAL12(byc), vm->sp);
-			stk_push(vm, vm->pc+1, vm->sp);
-		break;
-		
-		case OP_SPLIRF:
-			stk_push(vm, vm->pc+1, vm->sp);
-			stk_push(vm, vm->pc + BYTECODE_VAL12(byc), vm->sp);
-		break;
-		
-		case OP_SPLIRB:
-			stk_push(vm, vm->pc+1, vm->sp);
-			stk_push(vm, vm->pc - BYTECODE_VAL12(byc), vm->sp);
-		break;
-		
-		case OP_JMPF:
-			stk_push(vm, vm->pc + BYTECODE_VAL12(byc), vm->sp);
-		break;
-		
-		case OP_JMPB:
-			stk_push(vm, vm->pc - BYTECODE_VAL12(byc), vm->sp);
-		break;
+		case OP_JMP:
+			vm->pc += BYTECODE_IVAL11(byc);
+		return 1;
 		
 		case OP_NODE:
 			op_node(vm, OPEV_NODEEX_NEW, BYTECODE_VAL12(byc));
-			stk_push(vm, vm->pc+1, vm->sp);	
 		break;
 		
 		case OP_CALL:
 			op_call(vm, BYTECODE_VAL12(byc));
-		break;
+		return 1;
 		
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
+				case OPE_MATCH: return BYTECODE_VAL08(byc);
+				
 				case OPE_SAVE:
 					op_save(vm, BYTECODE_VAL08(byc));
-					stk_push(vm, vm->pc+1, vm->sp);
 				break;
 				
 				case OPE_RET:
-					op_ret(vm, BYTECODE_VAL08(byc));
-				break;
+				return op_ret(vm, BYTECODE_VAL08(byc));
 				
 				case OPE_NODEEX:
 					op_node(vm, BYTECODE_VAL08(byc), 0);
-					stk_push(vm, vm->pc+1, vm->sp);
 				break;
 				
 				case OPE_ERROR:
 					op_error(vm, BYTECODE_VAL08(byc));
-					stk_push(vm, vm->pc+1, vm->sp);
 				break;
 			}
 		break;
 	}
-	return -1;
+	
+	++vm->pc;
+	return 1;
 }
 
 int lips_vm_match(lipsVM_s* vm){
 	while( lips_vm_exec(vm) );
+	if( vm->match->count ) ++vm->match->count;
 	if( m_header(vm->node)->len ) vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
 	return vm->match->count;
 }
