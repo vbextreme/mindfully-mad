@@ -796,6 +796,7 @@ __private void def_sem_promote_word_rulename(lcc_s* lc){
 	ENTER("rule_def");
 	ENTER("word");
 	TYPE("ruleName");
+	SCOPESYMBOL();
 	SMATCH();
 }
 
@@ -824,6 +825,7 @@ __private void def_sem_promote_builtin_errnum(lcc_s* lc){
 	ENTER("builtin_error");
 	ENTER("num");
 	TYPE("ErrNum");
+	SCOPESYMBOL();
 	SMATCH();
 }
 
