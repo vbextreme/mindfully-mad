@@ -262,12 +262,13 @@ __private int op_value(lipsVM_s* vm, unsigned mode){
 	return 0;
 }
 
-__private lipsAst_s* scope_symbol_search_byid(lipsScope_s* scope, unsigned id){
+__private lipsAst_s* scope_symbol_search_content(lipsScope_s* scope, unsigned id, lipsAst_s* node){
 	if( !scope ) return NULL;
 	mforeach(scope->symbols, i){
-		if( scope->symbols[i]->id == id ) return scope->symbols[i];
+		if( scope->symbols[i]->id == id && scope->symbols[i]->len == node->len && !strncmp((const char*)scope->symbols[i]->sp, (const char*)node->sp, node->len)) 
+			return scope->symbols[i];
 	}
-	return scope_symbol_search_byid(scope->parent, id);
+	return scope_symbol_search_content(scope->parent, id, node);
 }
 
 __private void scope_symbol_add(lipsScope_s* scope, lipsAst_s* node){
@@ -341,7 +342,7 @@ int lips_vm_exec(lipsVM_s* vm){
 		case OP_TYPE: vm->ip->id = BYTECODE_VAL12(byc); break;
 		
 		case OP_SYMBOL:
-			if( !scope_symbol_search_byid(vm->sc, BYTECODE_VAL12(byc)) ) return stk_pop(vm);
+			if( !scope_symbol_search_content(vm->sc, BYTECODE_VAL12(byc), vm->ip) ) return stk_pop(vm);
 		break;
 		
 		case OP_EXT:

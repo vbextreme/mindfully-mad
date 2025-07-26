@@ -146,7 +146,7 @@ void lcc_err_die(lcc_s* lc);
 #define LEAVE(N)    do{ lcc_leave(_lcc); }while(0)
 #define VALUET(N)     do{ lcc_value(_lcc, 1, N, strlen(N)); } while(0)
 #define VALUES(N)     do{ lcc_value(_lcc, 0, N, strlen(N)); } while(0)
-#define SYMBOL(ST,N)  do{ lcc_symbol(_lcc, N, strlen(N)); } while(0)
+#define SYMBOL(N)     do{ lcc_symbol(_lcc, N, strlen(N)); } while(0)
 #define SCOPENEW()    do{ lcc_scope(_lcc, 0); } while(0)
 #define SCOPELEAVE()  do{ lcc_scope(_lcc, 1); } while(0)
 #define SCOPESYMBOL() do{ lcc_scope(_lcc, 2); } while(0)

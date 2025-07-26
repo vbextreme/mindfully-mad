@@ -123,19 +123,7 @@ _start_: (skip grammar @[0])+;
 
 %[0];
 %rule_def(word+ruleName);
-
 %quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
-#ENTER quantifier
-#ENTER qspec
-#ENTER lnum
-#VALUE get '0'
-#LEAVE
-#ENTER rnum
-#TALUE '1'
-#LEAVE
-#TYPE  qtype
-#VALUE '1'
-
 %builtin_error(num+ErrNum);
 
 %[1];

@@ -122,6 +122,11 @@ _start_: (skip grammar @[0])+;
 %[0];
 %rule_def(word+ruleName);
 %quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
+%builtin_error(num+ErrNum);
+%[1];
+%rule_primary(word?(ruleName|@[20])>call);
+%rule_binerr(num?(ErrNum|@[21]));
+
 
 
 
@@ -811,12 +816,63 @@ __private void def_sem_change_special_quantifier(lcc_s* lc){
 	SMATCH();
 }
 
+//%builtin_error(num+ErrNum);
+__private void def_sem_promote_builtin_errnum(lcc_s* lc){
+	INIT(lc);
+	NAME("ErrNum");
+	SEMRULE();
+	ENTER("builtin_error");
+	ENTER("num");
+	TYPE("ErrNum");
+	SMATCH();
+}
+
 //%[0];
 __private void def_semantic_stage0(lcc_s* lc){
 	INIT(lc);
 	SEMFASE();
 	def_sem_promote_word_rulename(lc);
 	def_sem_change_special_quantifier(lc);
+	def_sem_promote_builtin_errnum(lc);
+}
+
+//%rule_primary(word?(ruleName|@[20])>call);
+__private void def_sem_promote_word_call(lcc_s* lc){
+	INIT(lc);
+	NAME("call");
+	SEMRULE();
+	ENTER("rule_primary");
+	ENTER("word");
+	OR2(
+		SYMBOL("ruleName");
+	,
+		ERROR(20);
+		SMATCH();
+	);
+	TYPE("call");
+	SMATCH();
+}
+
+//%rule_binerr(num?(ErrNum|@[21]));
+__private void def_sem_call_error(lcc_s* lc){
+	INIT(lc);
+	SEMRULE();
+	ENTER("rule_binerr");
+	ENTER("num");
+	OR2(
+		SYMBOL("ErrNum");
+	,
+		ERROR(21);
+	);
+	SMATCH();
+}
+
+//%[1];
+__private void def_semantic_stage1(lcc_s* lc){
+	INIT(lc);
+	SEMFASE();
+	def_sem_promote_word_call(lc);
+	def_sem_call_error(lc);
 }
 
 //@error[1]  'aspected char \':\', declare new rule';
@@ -838,7 +894,8 @@ __private void def_semantic_stage0(lcc_s* lc){
 //@error[17] 'invalid operation, aspected promotion, symbol or query'
 //@error[18] 'invalid child'
 //@errpr[19] 'invalid semantic'
-
+//@error[20] 'rule is not defined';
+//@error[21] 'undefined error number';
 __private void dec_error(lcc_s* lc){
 	INIT(lc);
 	ERRADD("aspected \':\', declare new rule");
@@ -860,6 +917,8 @@ __private void dec_error(lcc_s* lc){
 	ERRADD("invalid operation, aspected promotion, symbol or query");
 	ERRADD("invalid child");
 	ERRADD("invalid semantic");
+	ERRADD("rule is not defined");
+	ERRADD("undefined error number");
 }
 
 //_start_: (grammar $reset)+;
@@ -927,6 +986,7 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_grammar_end(ROBJ());
 	def_grammar(ROBJ());
 	def_semantic_stage0(ROBJ());
+	def_semantic_stage1(ROBJ());
 	START(0);
 	OMQ(
 		CALL("skip");
