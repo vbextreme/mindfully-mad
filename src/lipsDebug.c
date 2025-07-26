@@ -100,6 +100,9 @@ __private void revdraw_stack(lipsVMDebug_s* d, unsigned sc){
 		d->vm->stack[sc].sp-d->vm->txt,
 		d->vm->stack[sc].ls
 	);
+	if( d->vm->stack[sc].ip ){
+		printf(" ip:%3X", d->vm->stack[sc].ip->id);
+	}
 }
 
 __private void revdraw_cstack(lipsVMDebug_s* d, unsigned sc){
@@ -195,7 +198,7 @@ __private void draw_input(lipsVMDebug_s* d, int oncol){
 	term_reset();
 }
 
-__private void draw_opcode(lipsVMDebug_s* d, unsigned pc){
+__private unsigned draw_opcode(lipsVMDebug_s* d, unsigned pc){
 	unsigned byc = d->vm->byc->code[pc];
 	switch( BYTECODE_CMD40(byc) ){
 		default : printf("INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
@@ -222,6 +225,9 @@ __private void draw_opcode(lipsVMDebug_s* d, unsigned pc){
 		case OP_JMP   : printf("jmp   %X", pc + BYTECODE_IVAL11(byc)); break;
 		case OP_NODE  : printf("node  new::%s::%u", d->vm->byc->fnName[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
 		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), d->vm->byc->fnName[BYTECODE_VAL12(byc)], d->vm->byc->fn[BYTECODE_VAL12(byc)]); break;
+		case OP_ENTER : printf("enter %X",BYTECODE_VAL12(byc)); break;
+		case OP_TYPE  : printf("type  %X",BYTECODE_VAL12(byc)); break;
+
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
 				case OPE_MATCH : printf("match %u", BYTECODE_VAL08(byc)); break;
@@ -234,11 +240,28 @@ __private void draw_opcode(lipsVMDebug_s* d, unsigned pc){
 						case OPEV_NODEEX_ENABLE : printf("node  enable"); break;
 					}
 				break;
+				case OPE_LEAVE: printf("leave"); break;
+				case OPE_VALUE:{
+					unsigned len;
+					uint32_t next;
+					const char* str = lipsByc_extract_string(d->vm->byc->bytecode, pc, &next, &len);
+					switch(BYTECODE_VAL08(byc)){
+						default: printf("INTERNAL ERROR OPEV_VALUE CMD08 0x%X", BYTECODE_VAL08(byc)); break;
+						case OPEV_VALUE_SET:
+							printf("value set, '%s'", str);
+						break;
+						case OPEV_VALUE_TEST:
+							printf("value test, '%s'", str);
+						break;
+					}
+					return next-pc;
+				}
 				case OPE_ERROR: printf("error %u", BYTECODE_VAL08(byc)); break;
 				default: printf("INTERNAL ERROR CMD04: 0x%X", BYTECODE_CMD04(byc)); break;
 			}
 		break;
 	}
+	return 1;
 }
 
 __private void draw_code(lipsVMDebug_s* d){
@@ -266,7 +289,11 @@ __private void draw_code(lipsVMDebug_s* d){
 			printf(" ");
 		}
 		printf("%04X  ", i);
-		draw_opcode(d, i);
+		unsigned n = draw_opcode(d, i);
+		if( n > 1 ){
+			high += n;
+			i += n-1;
+		}
 		term_reset();
 	}
 }
@@ -274,7 +301,7 @@ __private void draw_code(lipsVMDebug_s* d){
 __private void draw_step(lipsVMDebug_s* d){
 	term_surface_clear(d->header);
 	term_surface_focus(d->header);
-	printf("start:%04X ranges:%u functions:%u codesize: %X stacksize:%u rerr:%u", 
+	printf("start:%04X ranges:%u functions:%u codesize: %X stacksize:%u rerr:%u",
 			d->vm->byc->start,
 			d->vm->byc->rangeCount,
 			d->vm->byc->fnCount,
@@ -282,16 +309,15 @@ __private void draw_step(lipsVMDebug_s* d){
 			d->stackLen,
 			d->vm->er
 	);
+	if( d->vm->ip ) printf(" ip:%3X", d->vm->ip->id);
 	reverse_draw(d, d->stack, m_header(d->vm->stack)->len, revdraw_stack);
 	reverse_draw(d, d->cstack, m_header(d->vm->cstk)->len, revdraw_cstack);
 	reverse_draw(d, d->node, m_header(d->vm->node)->len, revdraw_node);
 	reverse_draw(d, d->save, d->vm->match->count+1, revdraw_save);
 	reverse_draw(d, d->brk, m_header(d->breakpoint)->len, revdraw_breakpoint);
 	term_surface_clear(d->range);
-	//if( d->stackLen ){
-		draw_input(d, -1);
-		draw_code(d);
-	//}
+	draw_input(d, -1);
+	draw_code(d);
 	term_flush();
 }
 
@@ -302,7 +328,6 @@ __private void prompt(lipsVMDebug_s* d){
 	m_free(d->cinp.argv);
 	term_flush();
 	d->cinp.line = readline("> ");
-	term_flush();
 	d->cinp.argv = str_splitin(d->cinp.line, " ", 0);
 	if( m_header(d->cinp.argv)->len == 0 ){
 		unsigned i = m_ipush(&d->cinp.argv);
@@ -343,7 +368,7 @@ __private void action_step(lipsVMDebug_s* d){
 }
 
 __private void action_next(lipsVMDebug_s* d){
-	const unsigned pc  = d->vm->stack[d->curStack].pc;
+	const unsigned pc  = d->vm->pc;
 	const unsigned byc = d->vm->byc->code[pc];
 	if( BYTECODE_CMD40(byc) == OP_CALL ){
 		d->brrm = 0;
@@ -432,6 +457,24 @@ __private void command_parse(lipsVMDebug_s* d){
 	}
 }
 
+__private dbgState_e debug_exec(lipsVMDebug_s* d){
+	d->stackLen = m_header(d->vm->stack)->len;
+	d->curStack = d->stackLen ? d->stackLen - 1: 0;
+	draw_step(d);
+	if( breakpoint_find(d, d->vm->pc) != -1 ) d->state = DBG_STATE_BREAK;
+	if( d->state == DBG_STATE_STEP ) d->state = DBG_STATE_BREAK;
+	while( d->state == DBG_STATE_BREAK ){
+		if( d->brrm ){
+			iassert(m_header(d->breakpoint)->len >= d->brrm);
+			m_header(d->breakpoint)->len -= d->brrm;
+			d->brrm = 0;
+		}
+		prompt(d);
+		command_parse(d);
+	}
+	return d->state;
+}
+
 void lips_vm_debug(lipsVM_s* vm){
 	dbg_info("");
 	lipsVMDebug_s d;
@@ -445,27 +488,23 @@ void lips_vm_debug(lipsVM_s* vm){
 	d.breakpoint = MANY(uint32_t, 16);
 	term_cls();
 	term_multi_surface_draw(&d.tms);
-	do{
-		d.stackLen = m_header(vm->stack)->len;
-		d.curStack = d.stackLen ? d.stackLen - 1: 0;
-		//d.curPC    = d.stackLen ? vm->stack[d.curStack].pc: 0;
-		draw_step(&d);
-//		if( breakpoint_find(&d, d.curPC) != -1 ) d.state = DBG_STATE_BREAK;
-		if( breakpoint_find(&d, d.vm->pc) != -1 ) d.state = DBG_STATE_BREAK;
-		if( d.state == DBG_STATE_STEP ) d.state = DBG_STATE_BREAK;
-		while( d.state == DBG_STATE_BREAK ){
-			if( d.brrm ){
-				iassert(m_header(d.breakpoint)->len >= d.brrm);
-				m_header(d.breakpoint)->len -= d.brrm;
-				d.brrm = 0;
-			}
-			prompt(&d);
-			command_parse(&d);
-		}
-	}while( d.state != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
+	while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
 	term_cls();
 	term_flush();
-	if( m_header(vm->node)->len ) vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
+	if( m_header(vm->node)->len ){
+		vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
+		vm->po = lips_ast_postorder(vm->match->ast);
+		mforeach(vm->byc->sfase, isf){
+			mforeach(vm->po, in){
+				mforeach(vm->byc->sfase[isf].addr, ia){
+					lips_vm_semantic_reset(vm);
+					vm->pc = vm->byc->sfase[isf].addr[ia];
+					vm->ip = vm->po[in];
+					while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
+				}
+			}
+		}
+	}
 }
 
 void lips_dump_error(lipsVM_s* vm, lipsMatch_s* m, const utf8_t* source, FILE* f){

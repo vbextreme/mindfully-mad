@@ -81,6 +81,7 @@ __private void stk_push(lipsVM_s* vm, unsigned pc){
 	vm->stack[i].ls = vm->match->count;
 	vm->stack[i].cp = m_header(vm->cstk)->len;
 	vm->stack[i].np = m_header(vm->node)->len;
+	vm->stack[i].ip = vm->ip;
 }
 
 __private int stk_pop(lipsVM_s* vm){
@@ -88,6 +89,7 @@ __private int stk_pop(lipsVM_s* vm){
 	if( i < 0 ) return 0;
 	vm->pc = vm->stack[i].pc;
 	vm->sp = vm->stack[i].sp;
+	vm->ip = vm->stack[i].ip;
 	vm->match->count = vm->stack[i].ls;
 	m_header(vm->cstk)->len = vm->stack[i].cp;
 	m_header(vm->node)->len = vm->stack[i].np;
@@ -115,6 +117,7 @@ void lips_vm_dtor(lipsVM_s* vm){
 	m_free(vm->stack);
 	m_free(vm->cstk);
 	m_free(vm->node);
+	m_free(vm->po);
 }
 
 lipsMatch_s* lips_match_ctor(lipsMatch_s* match){
@@ -141,12 +144,23 @@ void lips_vm_reset(lipsVM_s* vm, lipsMatch_s* match, const utf8_t* txt){
 	m_clear(vm->stack);
 	m_clear(vm->cstk);
 	m_clear(vm->node);
+	m_free(vm->po);
+	vm->po = NULL;
+	vm->ip = NULL;
 	if( txt ) vm->txt = txt;
 	vm->match = match;
 	lips_match_reset(vm->match);
 	vm->er = 0;
 	vm->pc = vm->byc->start;
 	vm->sp = txt;
+}
+
+void lips_vm_semantic_reset(lipsVM_s* vm){
+	m_clear(vm->stack);
+	m_clear(vm->cstk);
+	m_clear(vm->node);
+	vm->er = 0;
+	vm->ip = 0;
 }
 
 __private int op_range(lipsVM_s* vm, unsigned ir, utf8_t ch){
@@ -212,6 +226,24 @@ __private void op_node(lipsVM_s* vm, lipsOP_e op, unsigned id){
 	vm->node[i].op = op;
 }
 
+__private int op_value(lipsVM_s* vm, unsigned mode){
+	unsigned len;
+	const char* str = lipsByc_extract_string(vm->byc->bytecode, vm->pc, &vm->pc, &len);
+	switch( mode ){
+		case OPEV_VALUE_SET:
+			vm->ip->len = len;
+			vm->ip->sp  = (const utf8_t*)str;
+		return 1;
+		
+		case OPEV_VALUE_TEST:
+			if( vm->ip->len != len ) return 0;
+			if( strncmp((char*)vm->ip->sp, str, len) ) return 0;
+		return 1;
+	}
+	die("internal error, opev_value unknown %u", mode);
+	return 0;
+}
+
 int lips_vm_exec(lipsVM_s* vm){
 	const unsigned byc = vm->byc->code[vm->pc];
 	switch( BYTECODE_CMD40(byc) ){
@@ -251,14 +283,23 @@ int lips_vm_exec(lipsVM_s* vm){
 		case OP_JMP:
 			vm->pc += BYTECODE_IVAL11(byc);
 		return 1;
+	
+		case OP_CALL:
+			op_call(vm, BYTECODE_VAL12(byc));
+		return 1;
 		
 		case OP_NODE:
 			op_node(vm, OPEV_NODEEX_NEW, BYTECODE_VAL12(byc));
 		break;
 		
-		case OP_CALL:
-			op_call(vm, BYTECODE_VAL12(byc));
-		return 1;
+		case OP_ENTER:
+			vm->ip = lips_ast_child_id(vm->ip, BYTECODE_VAL12(byc));
+			if( !vm->ip ) return stk_pop(vm);
+		break;
+		
+		case OP_TYPE:
+			vm->ip->id = BYTECODE_VAL12(byc);
+		break;
 		
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
@@ -275,6 +316,13 @@ int lips_vm_exec(lipsVM_s* vm){
 					op_node(vm, BYTECODE_VAL08(byc), 0);
 				break;
 				
+				case OPE_LEAVE:
+					vm->ip = vm->ip->parent;
+					if( !vm->ip ) return stk_pop(vm);
+				break;
+				
+				case OPE_VALUE: return op_value(vm, BYTECODE_VAL08(byc));
+				
 				case OPE_ERROR:
 					op_error(vm, BYTECODE_VAL08(byc));
 				break;
@@ -287,9 +335,22 @@ int lips_vm_exec(lipsVM_s* vm){
 }
 
 int lips_vm_match(lipsVM_s* vm){
-	while( lips_vm_exec(vm) );
+	while( lips_vm_exec(vm) > 0 );
 	if( vm->match->count ) ++vm->match->count;
-	if( m_header(vm->node)->len ) vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
+	if( m_header(vm->node)->len ){
+		vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
+		vm->po = lips_ast_postorder(vm->match->ast);
+		mforeach(vm->byc->sfase, isf){
+			mforeach(vm->po, in){
+				mforeach(vm->byc->sfase[isf].addr, ia){
+					lips_vm_semantic_reset(vm);
+					vm->pc = vm->byc->sfase[isf].addr[ia];
+					vm->ip = vm->po[in];
+					while( lips_vm_exec(vm) > 0 );
+				}
+			}
+		}
+	}
 	return vm->match->count;
 }
 

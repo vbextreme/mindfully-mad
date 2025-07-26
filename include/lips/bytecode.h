@@ -97,6 +97,7 @@ typedef struct lipsByc{
 	uint16_t     sectionCode;
 }lipsByc_s;
 
+const char* lipsByc_extract_string(uint16_t* byc, uint32_t offset, uint32_t* next, unsigned* len);
 lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode);
 void lipsByc_dtor(lipsByc_s* byc);
 long lipsByc_name_toid(lipsByc_s* byc, const char* name);

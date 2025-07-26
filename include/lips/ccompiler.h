@@ -97,6 +97,9 @@ lcc_s* lcc_semantic_fase_new(lcc_s* rc);
 lcc_s* lcc_semantic_rule_new(lcc_s* rc);
 lcc_s* lcc_enter(lcc_s* rc, const char* name, unsigned len);
 uint16_t* lcc_make(lcc_s* rc);
+lcc_s* lcc_type(lcc_s* rc, const char* name, unsigned len);
+lcc_s* lcc_leave(lcc_s* rc);
+lcc_s* lcc_value(lcc_s* rc, unsigned settest, const char* str, unsigned len);
 const char* lcc_err_str(lcc_s* lc, char info[4096]);
 void lcc_err_die(lcc_s* lc);
 
@@ -137,6 +140,9 @@ void lcc_err_die(lcc_s* lc);
 #define SEMFASE()   do{ lcc_semantic_fase_new(_lcc); }while(0)
 #define SEMRULE()   do{ lcc_semantic_rule_new(_lcc); }while(0)
 #define ENTER(N)    do{ lcc_enter(_lcc, N, strlen(N)); }while(0)
+#define TYPE(N)     do{ lcc_type(_lcc, N, strlen(N)); }while(0)
+#define LEAVE(N)    do{ lcc_leave(_lcc); }while(0)
+#define VALUE(ST,N) do{ lcc_value(_lcc, ST, N, strlen(N)); } while(0)
 #define MAKE(SET)   do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
 
 #define OR2(CMDSA, CMDSB) do{\

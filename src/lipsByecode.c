@@ -26,6 +26,13 @@ __private lipsSFase_s* map_semantic(const uint16_t* section, const unsigned coun
 	return ret;
 }
 
+const char* lipsByc_extract_string(uint16_t* byc, uint32_t offset, uint32_t* next, unsigned* len){
+	char* str = (char*)&byc[offset];
+	*len = strlen(str);
+	*next = ROUND_UP(*len, 2) / 2;
+	return str;
+}
+
 lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode){
 	dbg_info("");
 	byc->format = bytecode[BYC_FORMAT];

@@ -48,6 +48,15 @@ __private unsigned push_bytecode(lcc_s* lc, uint16_t byc){
 	return i;
 }
 
+__private void push_bytecode_string(lcc_s* lc, const char* str, unsigned len){
+	const unsigned nlen = ROUND_UP(len,2);
+	const unsigned ilen = nlen/2;
+	const unsigned pc   = m_header(lc->bytecode)->len;
+	lc->bytecode = m_grow(lc->bytecode, ilen);
+	memcpy(&lc->bytecode[pc], str, len);
+	m_header(lc->bytecode)->len += ilen;
+}
+
 __private long name_to_i(lcc_s* rc, const char* name){
 	mforeach(rc->fn, i){
 		if( !strcmp(rc->fn[i].name, name) ) return i;
@@ -347,6 +356,31 @@ lcc_s* lcc_enter(lcc_s* rc, const char* name, unsigned len){
 		return NULL;
 	}
 	push_bytecode(rc, OP_ENTER | (n&0x0FFF));
+	return rc;
+}
+
+lcc_s* lcc_type(lcc_s* rc, const char* name, unsigned len){
+	__free char* tmp = str_dup(name, len);
+	long n = name_to_i(rc, name);
+	if( n < 0 ){
+		rc->err     = LCC_ERR_UNKNOWN_NODE;
+		rc->errid   = len;
+		rc->erstr   = name;
+		return NULL;
+	}
+	push_bytecode(rc, OP_TYPE | (n&0x0FFF));
+	return rc;
+}
+
+lcc_s* lcc_leave(lcc_s* rc){
+	push_bytecode(rc, OP_EXT | OPE_LEAVE);
+	return rc;
+}
+
+lcc_s* lcc_value(lcc_s* rc, unsigned settest, const char* str, unsigned len){
+	const uint16_t ope = settest ? OPEV_VALUE_TEST: OPEV_VALUE_SET;
+	push_bytecode(rc, OP_EXT | OPE_VALUE | ope);
+	push_bytecode_string(rc, str, len);
 	return rc;
 }
 

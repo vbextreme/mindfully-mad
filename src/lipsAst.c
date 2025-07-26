@@ -76,3 +76,30 @@ void lips_ast_dtor(lipsAst_s* node){
 	recast_dtor(node);
 	m_free(node);
 }
+
+__private void po_ast(lipsAst_s*** po, lipsAst_s* node){
+	mforeach(node->child, i){
+		po_ast(po, &node->child[i]);
+	}
+	unsigned i = m_ipush(po);
+	(*po)[i] = node;
+}
+
+lipsAst_s** lips_ast_postorder(lipsAst_s* root){
+	lipsAst_s** po = MANY(lipsAst_s*, 512);
+	po_ast(&po, root);
+	return po;
+}
+
+lipsAst_s* lips_ast_child_id(lipsAst_s* node, unsigned id){
+	mforeach(node->child, i){
+		if( node->child[i].id == id ) return &node->child[i];
+	}
+	return NULL;
+}
+
+
+
+
+
+

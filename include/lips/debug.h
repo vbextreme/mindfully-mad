@@ -5,11 +5,11 @@
 
 #define LIPS_DBG_X         0
 #define LIPS_DBG_Y         0
-#define LIPS_DBG_SCREEN_W  120
+#define LIPS_DBG_SCREEN_W  125
 #define LIPS_DBG_HEADER_H  3
 #define LIPS_DBG_HEADER_W  LIPS_DBG_SCREEN_W
 #define LIPS_DBG_STACKED_H 7
-#define LIPS_DBG_STACK_W   29
+#define LIPS_DBG_STACK_W   34
 #define LIPS_DBG_CSTACK_W  14
 #define LIPS_DBG_NODE_W    54
 #define LIPS_DBG_CAPTURE_W 17
