@@ -123,9 +123,6 @@ _start_: (skip grammar @[0])+;
 
 %[0];
 %rule_def(word+ruleName);
-#ENTER rule_def
-#ENTER word
-#TYPE  rulename
 
 %quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
 #ENTER quantifier

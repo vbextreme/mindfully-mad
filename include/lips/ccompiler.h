@@ -66,7 +66,7 @@ typedef struct lcc{
 lcc_s* lcc_ctor(lcc_s* rc);
 void lcc_dtor(lcc_s* rc);
 unsigned lcc_push_name(lcc_s* rc, const char* name, unsigned len);
-lcc_s* lcc_match(lcc_s* rc);
+lcc_s* lcc_match(lcc_s* rc, unsigned save, uint8_t ret);
 lcc_s* lcc_char(lcc_s* rc, uint8_t val);
 lcc_s* lcc_utf8(lcc_s* rc, const utf8_t* val);
 lccrange_s* lcc_range_ctor(lccrange_s* range);
@@ -109,7 +109,7 @@ void lcc_err_die(lcc_s* lc);
 #define INIT(R)     lcc_s* _lcc = (R)
 #define ROBJ()      (&_lccobj)
 #define DTOR()      do{ lcc_dtor(_lcc); }while(0)
-#define MATCH()     do{ lcc_match(_lcc); }while(0)
+#define MATCH()     do{ lcc_match(_lcc, 1, 0); }while(0)
 #define CHAR(CH)    do{ lcc_char(_lcc, CH); }while(0)
 #define UNI(UTF8)   do{ lcc_utf8(_lcc, UTF8); }while(0)
 #define USERANGE(R) lccrange_s _tmprange; lcc_range_ctor(&_tmprange)
@@ -144,11 +144,14 @@ void lcc_err_die(lcc_s* lc);
 #define ENTER(N)    do{ lcc_enter(_lcc, N, strlen(N)); }while(0)
 #define TYPE(N)     do{ lcc_type(_lcc, N, strlen(N)); }while(0)
 #define LEAVE(N)    do{ lcc_leave(_lcc); }while(0)
-#define VALUE(ST,N) do{ lcc_value(_lcc, ST, N, strlen(N)); } while(0)
+#define VALUET(N)     do{ lcc_value(_lcc, 1, N, strlen(N)); } while(0)
+#define VALUES(N)     do{ lcc_value(_lcc, 0, N, strlen(N)); } while(0)
 #define SYMBOL(ST,N)  do{ lcc_symbol(_lcc, N, strlen(N)); } while(0)
 #define SCOPENEW()    do{ lcc_scope(_lcc, 0); } while(0)
 #define SCOPELEAVE()  do{ lcc_scope(_lcc, 1); } while(0)
 #define SCOPESYMBOL() do{ lcc_scope(_lcc, 2); } while(0)
+#define NAME(N)       do{ lcc_push_name(_lcc, N, strlen(N)); } while(0)
+#define SMATCH()      do{ lcc_match(_lcc, 0, 0); }while(0)
 #define MAKE(SET)     do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
 
 #define OR2(CMDSA, CMDSB) do{\

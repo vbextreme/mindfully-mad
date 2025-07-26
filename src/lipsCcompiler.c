@@ -78,9 +78,9 @@ unsigned lcc_push_name(lcc_s* rc, const char* name, unsigned len){
 	return ret;
 }
 
-lcc_s* lcc_match(lcc_s* rc){
-	push_bytecode(rc, OP_EXT | OPE_SAVE | 1);
-	push_bytecode(rc, OP_EXT | OPE_MATCH);
+lcc_s* lcc_match(lcc_s* rc, unsigned save, uint8_t ret){
+	if( save ) push_bytecode(rc, OP_EXT | OPE_SAVE | 1);
+	push_bytecode(rc, OP_EXT | OPE_MATCH | ret);
 	return rc;
 }
 
@@ -478,7 +478,7 @@ uint16_t* lcc_make(lcc_s* rc){
 		len = ROUND_UP(len, 2);
 		len /= 2;
 		inc += len;
-	}	
+	}
 	//.section range
 	bc[BYC_SECTION_RANGE] = inc - bc;
 	mforeach(rc->range, i){

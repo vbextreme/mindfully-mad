@@ -121,7 +121,7 @@ _start_: (skip grammar @[0])+;
 
 %[0];
 %rule_def(word+ruleName);
-
+%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
 
 
 
@@ -782,6 +782,43 @@ __private void def_grammar(lcc_s* lc){
 	}
 }
 
+
+//%rule_def(word+ruleName);
+__private void def_sem_promote_word_rulename(lcc_s* lc){
+	INIT(lc);
+	SEMRULE();
+	NAME("ruleName");
+	ENTER("rule_def");
+	ENTER("word");
+	TYPE("ruleName");
+	SMATCH();
+}
+
+//%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
+__private void def_sem_change_special_quantifier(lcc_s* lc){
+	INIT(lc);
+	SEMRULE();
+	ENTER("quantifier");
+	ENTER("qspec");
+	ENTER("lnum");
+	VALUET("0");
+	LEAVE();
+	ENTER("rnum");
+	VALUET("1");
+	LEAVE();
+	TYPE("qtype");
+	VALUES("?");
+	SMATCH();
+}
+
+//%[0];
+__private void def_semantic_stage0(lcc_s* lc){
+	INIT(lc);
+	SEMFASE();
+	def_sem_promote_word_rulename(lc);
+	def_sem_change_special_quantifier(lc);
+}
+
 //@error[1]  'aspected char \':\', declare new rule';
 //@error[2]  'invalid number';
 //@error[3]  'required ; at end of rule';
@@ -889,6 +926,7 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_lips(ROBJ());
 	def_grammar_end(ROBJ());
 	def_grammar(ROBJ());
+	def_semantic_stage0(ROBJ());
 	START(0);
 	OMQ(
 		CALL("skip");
