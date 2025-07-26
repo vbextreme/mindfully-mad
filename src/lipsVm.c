@@ -103,13 +103,30 @@ __private int stk_pop_pc(lipsVM_s* vm){
 	return 1;
 }
 
+__private lipsScope_s* scope_new(lipsScope_s* parent){
+	lipsScope_s* scope = NEW(lipsScope_s);
+	scope->parent  = parent;
+	scope->child   = NULL;
+	scope->symbols = MANY(lipsAst_s*, 32);
+	return scope;
+}
+
 lipsVM_s* lips_vm_ctor(lipsVM_s* vm, lipsByc_s* byc){
 	dbg_info("");
 	vm->byc      = byc;
 	vm->stack    = MANY(lipsStack_s, vm->byc->codeLen);
 	vm->cstk     = MANY(unsigned, 128);
 	vm->node     = MANY(lipsAsl_s, vm->byc->fnCount);
+	vm->po       = NULL;
+	vm->scope    = scope_new(NULL);
 	return vm;
+}
+
+__private void scope_dtor(lipsScope_s* scope){
+	if( !scope ) return;
+	scope_dtor(scope->child);
+	m_free(scope->symbols);
+	m_free(scope);
 }
 
 void lips_vm_dtor(lipsVM_s* vm){
@@ -118,6 +135,7 @@ void lips_vm_dtor(lipsVM_s* vm){
 	m_free(vm->cstk);
 	m_free(vm->node);
 	m_free(vm->po);
+	scope_dtor(vm->scope);
 }
 
 lipsMatch_s* lips_match_ctor(lipsMatch_s* match){
@@ -244,6 +262,39 @@ __private int op_value(lipsVM_s* vm, unsigned mode){
 	return 0;
 }
 
+__private lipsAst_s* scope_symbol_search_byid(lipsScope_s* scope, unsigned id){
+	if( !scope ) return NULL;
+	mforeach(scope->symbols, i){
+		if( scope->symbols[i]->id == id ) return scope->symbols[i];
+	}
+	return scope_symbol_search_byid(scope->parent, id);
+}
+
+__private void scope_symbol_add(lipsScope_s* scope, lipsAst_s* node){
+	unsigned i = m_ipush(&scope->symbols);
+	scope->symbols[i] = node;
+}
+
+__private void op_scope(lipsVM_s* vm, unsigned mode){
+	switch(mode){
+		case OPEV_SCOPE_NEW:
+			vm->sc->child = scope_new(vm->sc);
+			vm->sc = vm->sc->child;
+		break;
+		
+		case OPEV_SCOPE_LEAVE:
+			if( !vm->sc->parent ) break;
+			vm->sc = vm->sc->parent;
+			scope_dtor(vm->sc->child);
+			vm->sc->child = NULL;
+		break;
+		
+		case OPEV_SCOPE_SYMBOL:
+			scope_symbol_add(vm->sc, vm->ip);
+		break;
+	}
+}
+
 int lips_vm_exec(lipsVM_s* vm){
 	const unsigned byc = vm->byc->code[vm->pc];
 	switch( BYTECODE_CMD40(byc) ){
@@ -271,60 +322,40 @@ int lips_vm_exec(lipsVM_s* vm){
 			//TODO
 		break;
 		
-		case OP_PUSH:
-			stk_push(vm, vm->pc + BYTECODE_IVAL11(byc));
-		break;
-	
-		case OP_PUSHR:
+		case OP_PUSH: stk_push(vm, vm->pc + BYTECODE_IVAL11(byc)); break;
+		
+		case OP_PUSHR: 
 			stk_push(vm, vm->pc + 1);
 			vm->pc += BYTECODE_IVAL11(byc);
 		return 1;
 		
-		case OP_JMP:
-			vm->pc += BYTECODE_IVAL11(byc);
-		return 1;
-	
-		case OP_CALL:
-			op_call(vm, BYTECODE_VAL12(byc));
-		return 1;
-		
-		case OP_NODE:
-			op_node(vm, OPEV_NODEEX_NEW, BYTECODE_VAL12(byc));
-		break;
+		case OP_JMP: vm->pc += BYTECODE_IVAL11(byc); return 1;
+		case OP_CALL: op_call(vm, BYTECODE_VAL12(byc)); return 1;
+		case OP_NODE: op_node(vm, OPEV_NODEEX_NEW, BYTECODE_VAL12(byc)); break;
 		
 		case OP_ENTER:
 			vm->ip = lips_ast_child_id(vm->ip, BYTECODE_VAL12(byc));
 			if( !vm->ip ) return stk_pop(vm);
 		break;
 		
-		case OP_TYPE:
-			vm->ip->id = BYTECODE_VAL12(byc);
+		case OP_TYPE: vm->ip->id = BYTECODE_VAL12(byc); break;
+		
+		case OP_SYMBOL:
+			if( !scope_symbol_search_byid(vm->sc, BYTECODE_VAL12(byc)) ) return stk_pop(vm);
 		break;
 		
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
-				case OPE_MATCH: return BYTECODE_VAL08(byc);
-				
-				case OPE_SAVE:
-					op_save(vm, BYTECODE_VAL08(byc));
-				break;
-				
-				case OPE_RET:
-				return op_ret(vm, BYTECODE_VAL08(byc));
-				
-				case OPE_NODEEX:
-					op_node(vm, BYTECODE_VAL08(byc), 0);
-				break;
-				
-				case OPE_LEAVE:
+				case OPE_MATCH : return BYTECODE_VAL08(byc);
+				case OPE_SAVE  : op_save(vm, BYTECODE_VAL08(byc)); break;
+				case OPE_RET   : return op_ret(vm, BYTECODE_VAL08(byc));
+				case OPE_NODEEX: op_node(vm, BYTECODE_VAL08(byc), 0); break;
+				case OPE_VALUE : return op_value(vm, BYTECODE_VAL08(byc));
+				case OPE_SCOPE : op_scope(vm, BYTECODE_VAL08(byc)); break;
+				case OPE_ERROR : op_error(vm, BYTECODE_VAL08(byc)); break;
+				case OPE_LEAVE :
 					vm->ip = vm->ip->parent;
 					if( !vm->ip ) return stk_pop(vm);
-				break;
-				
-				case OPE_VALUE: return op_value(vm, BYTECODE_VAL08(byc));
-				
-				case OPE_ERROR:
-					op_error(vm, BYTECODE_VAL08(byc));
 				break;
 			}
 		break;
@@ -339,7 +370,8 @@ int lips_vm_match(lipsVM_s* vm){
 	if( vm->match->count ) ++vm->match->count;
 	if( m_header(vm->node)->len ){
 		vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
-		vm->po = lips_ast_postorder(vm->match->ast);
+		vm->po         = lips_ast_postorder(vm->match->ast);
+		vm->sc         = vm->scope;
 		mforeach(vm->byc->sfase, isf){
 			mforeach(vm->po, in){
 				mforeach(vm->byc->sfase[isf].addr, ia){

@@ -27,14 +27,22 @@ typedef struct lipsStack{
 	unsigned      np;
 }lipsStack_s;
 
+typedef struct lipsScope{
+	struct lipsScope* child;
+	struct lipsScope* parent;
+	lipsAst_s**       symbols;
+}lipsScope_s;
+
 typedef struct lipsVM{
 	lipsByc_s*     byc;
 	lipsStack_s*   stack;
 	lipsMatch_s*   match;
 	unsigned*      cstk;
+	lipsScope_s*   scope;
 	lipsAsl_s*     node;
 	lipsAst_s**    po;
 	lipsAst_s*     ip;
+	lipsScope_s*   sc;
 	const utf8_t*  txt;
 	const utf8_t*  sp;
 	uint32_t       pc;

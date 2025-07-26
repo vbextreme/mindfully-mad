@@ -100,6 +100,8 @@ uint16_t* lcc_make(lcc_s* rc);
 lcc_s* lcc_type(lcc_s* rc, const char* name, unsigned len);
 lcc_s* lcc_leave(lcc_s* rc);
 lcc_s* lcc_value(lcc_s* rc, unsigned settest, const char* str, unsigned len);
+lcc_s* lcc_symbol(lcc_s* rc, const char* name, unsigned len);
+lcc_s* lcc_scope(lcc_s* rc, unsigned nls);
 const char* lcc_err_str(lcc_s* lc, char info[4096]);
 void lcc_err_die(lcc_s* lc);
 
@@ -143,7 +145,11 @@ void lcc_err_die(lcc_s* lc);
 #define TYPE(N)     do{ lcc_type(_lcc, N, strlen(N)); }while(0)
 #define LEAVE(N)    do{ lcc_leave(_lcc); }while(0)
 #define VALUE(ST,N) do{ lcc_value(_lcc, ST, N, strlen(N)); } while(0)
-#define MAKE(SET)   do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
+#define SYMBOL(ST,N)  do{ lcc_symbol(_lcc, N, strlen(N)); } while(0)
+#define SCOPENEW()    do{ lcc_scope(_lcc, 0); } while(0)
+#define SCOPELEAVE()  do{ lcc_scope(_lcc, 1); } while(0)
+#define SCOPESYMBOL() do{ lcc_scope(_lcc, 2); } while(0)
+#define MAKE(SET)     do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
 
 #define OR2(CMDSA, CMDSB) do{\
 	USENELBL(LNOR,2);\

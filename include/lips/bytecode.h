@@ -46,6 +46,7 @@ typedef enum{
 	OP_NODE     = 0xA000,
 	OP_ENTER    = 0xB000,
 	OP_TYPE     = 0xC000,
+	OP_SYMBOL   = 0xD000,
 	OP_EXT      = 0xF000,
 	OPE_MATCH          = 0x0000,
 	OPE_SAVE           = 0x0100,
@@ -59,6 +60,10 @@ typedef enum{
 	OPE_VALUE          = 0x0500,
 	OPEV_VALUE_SET     = 0x0001,
 	OPEV_VALUE_TEST    = 0x0002,
+	OPE_SCOPE          = 0x0600,
+	OPEV_SCOPE_NEW     = 0x0001,
+	OPEV_SCOPE_LEAVE   = 0x0002,
+	OPEV_SCOPE_SYMBOL  = 0x0003,
 	OPE_ERROR          = 0x0F00
 }lipsOP_e;
 

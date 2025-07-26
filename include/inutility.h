@@ -25,8 +25,6 @@ typedef struct termMultiSurface{
 	termSurfaceLine_s* line;
 }termMultiSurface_s;
 
-
-
 const char* skip_h(const char* p, const char* end);
 const char* skip_hn(const char* p, const char* end);
 size_t count_line_to(const char* begin, const char* end);

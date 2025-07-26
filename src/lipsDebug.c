@@ -227,6 +227,7 @@ __private unsigned draw_opcode(lipsVMDebug_s* d, unsigned pc){
 		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), d->vm->byc->fnName[BYTECODE_VAL12(byc)], d->vm->byc->fn[BYTECODE_VAL12(byc)]); break;
 		case OP_ENTER : printf("enter %X",BYTECODE_VAL12(byc)); break;
 		case OP_TYPE  : printf("type  %X",BYTECODE_VAL12(byc)); break;
+		case OP_SYMBOL: printf("symbol %X",BYTECODE_VAL12(byc)); break;
 
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
@@ -256,6 +257,14 @@ __private unsigned draw_opcode(lipsVMDebug_s* d, unsigned pc){
 					}
 					return next-pc;
 				}
+				case OPE_SCOPE:
+					switch(BYTECODE_VAL08(byc)){
+						default: printf("INTERNAL ERROR OPEV_VALUE CMD08 0x%X", BYTECODE_VAL08(byc)); break;
+						case OPEV_SCOPE_NEW   : printf("scope new"); break;
+						case OPEV_SCOPE_LEAVE : printf("scope leave"); break;
+						case OPEV_SCOPE_SYMBOL: printf("scope symbol"); break;
+					}
+				break;
 				case OPE_ERROR: printf("error %u", BYTECODE_VAL08(byc)); break;
 				default: printf("INTERNAL ERROR CMD04: 0x%X", BYTECODE_CMD04(byc)); break;
 			}
@@ -494,6 +503,7 @@ void lips_vm_debug(lipsVM_s* vm){
 	if( m_header(vm->node)->len ){
 		vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
 		vm->po = lips_ast_postorder(vm->match->ast);
+		vm->sc = vm->scope;
 		mforeach(vm->byc->sfase, isf){
 			mforeach(vm->po, in){
 				mforeach(vm->byc->sfase[isf].addr, ia){
@@ -538,7 +548,7 @@ void lips_dump_capture(lipsMatch_s* m, FILE* f){
 		fputs("lips capture: error, this never append for now\n", f);
 		return;
 	}
-	for( int i = 0; i < m->count; ++i ){
+	for( int i = 0; i < m->count/2; ++i ){
 		unsigned st = i*2;
 		unsigned en = st+1;
 		unsigned len = m->capture[en] - m->capture[st];

@@ -119,6 +119,8 @@ grammar: regex
 
 _start_: (skip grammar @[0])+;
 
+%[0];
+%rule_def(word+ruleName);
 
 
 
@@ -126,28 +128,6 @@ _start_: (skip grammar @[0])+;
 
 
 TODO
-
-##semantic
-#%[N]               stage N
-#>NAME              change node id to NAME
-#>NAME='value'      same prev and change value
-#+                  same > but add to symbol list
-#?('VALUE'|...|@[]) node need value or other value or raise error
-
-
-@error[14] 'rule is not defined';
-@error[15] 'undefined error number';
-
-%[0];
-%rule_def(word+ruleName);
-%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
-%builtin_error(num+ErrNum);
-
-%[1];
-%rule_primary(word?(ruleName|@[14])>call);
-%rule_binerr(num?(ErrNum|@[15]))
-
-
 ##emitter
 : > print on file
 : ! jitter

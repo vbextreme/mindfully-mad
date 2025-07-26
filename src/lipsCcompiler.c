@@ -384,6 +384,28 @@ lcc_s* lcc_value(lcc_s* rc, unsigned settest, const char* str, unsigned len){
 	return rc;
 }
 
+lcc_s* lcc_symbol(lcc_s* rc, const char* name, unsigned len){
+	__free char* tmp = str_dup(name, len);
+	long n = name_to_i(rc, name);
+	if( n < 0 ){
+		rc->err     = LCC_ERR_UNKNOWN_NODE;
+		rc->errid   = len;
+		rc->erstr   = name;
+		return NULL;
+	}
+	push_bytecode(rc, OP_SYMBOL | (n&0x0FFF));
+	return rc;
+}
+
+lcc_s* lcc_scope(lcc_s* rc, unsigned nls){
+	switch( nls ){
+		case 0: push_bytecode(rc, OP_EXT | OPE_SCOPE | OPEV_SCOPE_NEW); break;
+		case 1: push_bytecode(rc, OP_EXT | OPE_SCOPE | OPEV_SCOPE_LEAVE); break;
+		case 2: push_bytecode(rc, OP_EXT | OPE_SCOPE | OPEV_SCOPE_SYMBOL); break;
+	}
+	return rc;
+}
+
 uint16_t* lcc_make(lcc_s* rc){
 	if( rc->err ) return NULL;
 	
