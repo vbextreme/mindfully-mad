@@ -37,6 +37,7 @@ typedef struct lipsVMDebug{
 	uint32_t*          breakpoint;
 	unsigned           brrm;
 	unsigned           brtxt;
+	unsigned           brsem;
 	dbgState_e         state;
 }lipsVMDebug_s;
 
@@ -413,6 +414,11 @@ __private void action_breaktext(lipsVMDebug_s* d){
 	d->state = DBG_STATE_RUN;
 }
 
+__private void action_breaksemantic(lipsVMDebug_s* d){
+	d->brsem = 1;
+	d->state = DBG_STATE_RUN;
+}
+
 __private void action_breakremove(lipsVMDebug_s* d){
 	breakpoint_rm(d, strtoul(d->cinp.argv[1], NULL, 16));
 }
@@ -463,6 +469,11 @@ cmdmap_s CMD[] = {{
 		.act = action_breaktext,
 		.nam = 1
 	},{
+		.shr = "bs",
+		.lng = "breaksemantic",
+		.act = action_breaksemantic,
+		.nam = 1
+	},{
 		.shr = "r",
 		.lng = "refresh",
 		.act = action_refresh,
@@ -481,6 +492,7 @@ __private void command_parse(lipsVMDebug_s* d){
 }
 
 __private dbgState_e debug_exec(lipsVMDebug_s* d){
+	if( d->state == DBG_STATE_QUIT ) return DBG_STATE_QUIT;
 	d->stackLen = m_header(d->vm->stack)->len;
 	d->curStack = d->stackLen ? d->stackLen - 1: 0;
 	draw_step(d);
@@ -512,11 +524,14 @@ void lips_vm_debug(lipsVM_s* vm){
 	d.cinp.argv  = NULL;
 	d.state      = DBG_STATE_BREAK;
 	d.brrm       = 0;
+	d.brtxt      = 0;
+	d.brsem      = 0;
 	d.breakpoint = MANY(uint32_t, 16);
 	term_cls();
 	term_multi_surface_draw(&d.tms);
 	term_flush();
 	while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
+	if( d.brsem && d.state != DBG_STATE_QUIT ) d.state = DBG_STATE_STEP;
 	if( m_header(vm->node)->len ){
 		vm->match->ast = lips_ast_make(vm->node);
 		vm->sc         = vm->scope;
