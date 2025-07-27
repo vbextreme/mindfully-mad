@@ -4,10 +4,11 @@
 #include <notstd/core.h>
 
 typedef struct termSurface{
-	unsigned x;
-	unsigned y;
-	unsigned w;
-	unsigned h;
+	const char* name;
+	unsigned    x;
+	unsigned    y;
+	unsigned    w;
+	unsigned    h;
 }termSurface_s;
 
 typedef struct termSurfaceLine{
@@ -16,13 +17,13 @@ typedef struct termSurfaceLine{
 }termSurfaceLine_s;
 
 typedef struct termMultiSurface{
+	int8_t*            map;
+	termSurfaceLine_s* line;
 	unsigned x;
 	unsigned y;
 	unsigned w;
 	unsigned hmax;
 	unsigned wmax;
-	int8_t*  map;
-	termSurfaceLine_s* line;
 }termMultiSurface_s;
 
 const char* skip_h(const char* p, const char* end);
@@ -49,7 +50,7 @@ void term_vline(unsigned len);
 void term_cline(unsigned len);
 termMultiSurface_s* term_multi_surface_ctor(termMultiSurface_s* m, unsigned x, unsigned y,  unsigned sw);
 termMultiSurface_s* term_multi_surface_vsplit(termMultiSurface_s* m, unsigned h);
-termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, unsigned w);
+termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, const char* name, unsigned w);
 termMultiSurface_s* term_multi_surface_apply(termMultiSurface_s* m);
 termMultiSurface_s* term_multi_surface_draw(termMultiSurface_s* m);
 void term_surface_clear(termSurface_s* s);

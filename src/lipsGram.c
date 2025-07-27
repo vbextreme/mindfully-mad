@@ -127,12 +127,11 @@ _start_: (skip grammar @[0])+;
 %rule_primary(word?(ruleName|@[20])>call);
 %rule_binerr(num?(ErrNum|@[21]));
 
-
-
-
-
-
 TODO
+##semantic
+$+ scope new
+$- scope leave
+
 ##emitter
 : > print on file
 : ! jitter
@@ -211,6 +210,7 @@ __private void def_qspec(lcc_s* lc){
 __private void def_quantifier(lcc_s* lc){
 	INIT(lc);
 	FN("quantifier", 1, 4){
+		MARK();
 		OR2(
 			CALL("qtype");
 		,
@@ -463,6 +463,7 @@ __private void def_quoted(lcc_s* lc){
 __private void def_builtin_error(lcc_s* lc){
 	INIT(lc);
 	FN("builtin_error", 1, 0){
+		MARK();
 		CHAR('@');
 		CHAR('e');
 		CHAR('r');
@@ -492,6 +493,7 @@ __private void def_rule_flags(lcc_s* lc){
 __private void def_rule_def(lcc_s* lc){
 	INIT(lc);
 	FN("rule_def", 1, 0){
+		MARK();
 		CALL("skip");
 		CALL("word");
 		CALL("rule_flags");
@@ -516,6 +518,7 @@ __private void def_rule_group(lcc_s* lc){
 __private void def_rule_binerr(lcc_s* lc){
 	INIT(lc);
 	FN("rule_binerr", 1, 0){
+		MARK();
 		CHAR('@');
 		CHAR('[');
 		CALL("num");
@@ -531,6 +534,7 @@ __private void def_rule_binerr(lcc_s* lc){
 __private void def_rule_primary(lcc_s* lc){
 	INIT(lc);
 	FN("rule_primary", 1, 0){
+		MARK();
 		CHOOSE_BEGIN(4);
 		CALL("regex");
 		CHOOSE();

@@ -1,15 +1,21 @@
 #include <lips/ast.h>
 
-lipsAst_s* lips_ast_make(lipsAsl_s* node, lipsAst_s** last){
+lipsAstMatch_s lips_ast_make(lipsAsl_s* node){
+	lipsAstMatch_s m;
+	m.last   = NULL;
+	m.marked = MANY(lipsAst_s*, 32);
+	m.root    = NEW(lipsAst_s);
+	m.root->tp     = 0;
+	m.root->orgtp  = 0;
+	m.root->len    = 0;
+	m.root->orglen = 0;
+	m.root->id     = LIPS_NODE_START;
+	m.root->parent = NULL;
+	m.root->child  = MANY(lipsAst_s, 2);
+	lipsAst_s* current = m.root;
 	unsigned j;
-	lipsAst_s* start = NEW(lipsAst_s);
-	start->sp = 0;
-	start->id = LIPS_NODE_START;
-	start->parent = NULL;
-	start->child = MANY(lipsAst_s, 2);
-	lipsAst_s* current = start;
+	unsigned n;
 	unsigned disable = 0;
-
 	mforeach(node, i){
 		if( !current ) die("internall error, list node corrupted");
 		switch( node[i].op ){
@@ -17,15 +23,18 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node, lipsAst_s** last){
 			case OPEV_NODEEX_NEW:
 				if( disable ) break;
 				j = m_ipush(&current->child);
-				current->child[j].id = node[i].id;
-				current->child[j].sp = node[i].sp;
+				current->child[j].id     = node[i].id;
+				current->child[j].tp     = node[i].sp;
+				current->child[j].len    = 0;
+				current->child[j].orgtp  = NULL;
+				current->child[j].orglen = 0;
 				current->child[j].parent = current;
 				current->child[j].child  = MANY(lipsAst_s, 1);
 				current = &current->child[j];
 			break;
 			case OPEV_NODEEX_PARENT:
 				if( disable ) break;
-				current->len = node[i].sp - current->sp;
+				current->len = node[i].sp - current->tp;
 				current = current->parent;
 			break;
 			case OPEV_NODEEX_ENABLE:
@@ -34,12 +43,43 @@ lipsAst_s* lips_ast_make(lipsAsl_s* node, lipsAst_s** last){
 			break;
 			
 			case OPEV_NODEEX_DISABLE: ++disable; break;
+			
+			case OPEV_NODEEX_MARK:
+				n = m_ipush(&m.marked);
+				m.marked[n] = current;
+			break;
 		}
 	}
-	if( last ) *last = current;
-	return start;
+	m.last = current;
+	return m;
 }
 
+__private void recast_dtor(lipsAst_s* node){
+	mforeach(node->child, i){
+		recast_dtor(&node->child[i]);
+	}
+	m_free(node->child);
+}
+
+void lips_ast_dtor(lipsAst_s* node){
+	if( !node ) return;
+	recast_dtor(node);
+	m_free(node);
+}
+
+void lips_ast_match_dtor(lipsAstMatch_s* m){
+	lips_ast_dtor(m->root);
+	m_free(m->marked);
+}
+
+lipsAst_s* lips_ast_child_id(lipsAst_s* node, unsigned id){
+	mforeach(node->child, i){
+		if( node->child[i].id == id ) return &node->child[i];
+	}
+	return NULL;
+}
+
+/*
 lipsAst_s* lips_ast_branch(lipsAst_s* node){
 	if( !node->parent ) return node;
 	unsigned i;
@@ -64,18 +104,6 @@ lipsAst_s* lips_ast_rev_root(lipsAst_s* last){
 	return last;
 }
 
-__private void recast_dtor(lipsAst_s* node){
-	mforeach(node->child, i){
-		recast_dtor(&node->child[i]);
-	}
-	m_free(node->child);
-}
-
-void lips_ast_dtor(lipsAst_s* node){
-	if( !node ) return;
-	recast_dtor(node);
-	m_free(node);
-}
 
 __private void po_ast(lipsAst_s*** po, lipsAst_s* node){
 	mforeach(node->child, i){
@@ -91,13 +119,8 @@ lipsAst_s** lips_ast_postorder(lipsAst_s* root){
 	return po;
 }
 
-lipsAst_s* lips_ast_child_id(lipsAst_s* node, unsigned id){
-	mforeach(node->child, i){
-		if( node->child[i].id == id ) return &node->child[i];
-	}
-	return NULL;
-}
 
+*/
 
 
 

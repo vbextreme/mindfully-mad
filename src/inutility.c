@@ -188,11 +188,12 @@ termMultiSurface_s* term_multi_surface_vsplit(termMultiSurface_s* m, unsigned h)
 	return m;
 }
 
-termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, unsigned w){
+termMultiSurface_s* term_multi_surface_hsplit(termMultiSurface_s* m, const char* name, unsigned w){
 	const unsigned c = m_header(m->line)->len - 1;
 	dbg_info("w:%u", w);
 	const unsigned i = m_ipush(&m->line[c].surface);
-	m->line[c].surface[i].w = w;
+	m->line[c].surface[i].w    = w;
+	m->line[c].surface[i].name = name;
 	return m;
 }
 
@@ -320,6 +321,12 @@ termMultiSurface_s* term_multi_surface_draw(termMultiSurface_s* m){
 			else term_box(ch);
 		}
 		++y;
+	}
+	mforeach(m->line, il){
+		mforeach(m->line[il].surface, is){
+			term_gotoxy(m->line[il].surface[is].x+1, m->line[il].surface[is].y);
+			fputs(m->line[il].surface[is].name, stdout);
+		}
 	}
 	return m;
 }

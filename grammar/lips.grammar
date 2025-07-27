@@ -130,8 +130,4 @@ _start_: (skip grammar @[0])+;
 %rule_primary(word?(ruleName|@[20])>call);
 %rule_binerr(num?(ErrNum|@[21]));
 
-
-
-
-
-
+#end

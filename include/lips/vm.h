@@ -12,10 +12,10 @@ typedef struct lipsError{
 }lipsError_s;
 
 typedef struct lipsMatch{
-	lipsError_s   err;
-	lipsAst_s*    ast;
-	const utf8_t* capture[LIPS_MAX_CAPTURE * 2];
-	int           count;
+	lipsError_s    err;
+	lipsAstMatch_s ast;
+	const utf8_t*  capture[LIPS_MAX_CAPTURE * 2];
+	int            count;
 }lipsMatch_s;
 
 typedef struct lipsStack{
@@ -40,7 +40,6 @@ typedef struct lipsVM{
 	unsigned*      cstk;
 	lipsScope_s*   scope;
 	lipsAsl_s*     node;
-	lipsAst_s**    po;
 	lipsAst_s*     ip;
 	lipsScope_s*   sc;
 	const utf8_t*  txt;

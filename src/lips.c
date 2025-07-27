@@ -103,22 +103,22 @@ int main(int argc, char** argv){
 			argfclose(out);
 		}
 	
-		if( m.ast ){
+		if( m.ast.root ){
 			if( opt[OPT_dump_ast_file].set ){
 				FILE* out = argfopen(opt[OPT_dump_ast_file].value[it].str, "w");
-				lips_dump_ast(&vm, out, 0);
+				lips_dump_ast(&vm, m.ast.root, out, 0);
 				argfclose(out);
 			}
 			if( opt[OPT_dump_ast_dot].set ){
 				FILE* out = argfopen(opt[OPT_dump_ast_dot].value[it].str, "w");
-				lips_dump_ast(&vm, out, 1);
+				lips_dump_ast(&vm, m.ast.root, out, 1);
 				argfclose(out);
 			}
 			//if( eid != -1 ) lips_ast_dtor(dump);
 		}
 	}
 	
-	//lips_vm_dtor(&vm);
+	lips_vm_dtor(&vm);
 	lips_match_dtor(&m);
 	lipsByc_dtor(&lbyc);
 	return 0;

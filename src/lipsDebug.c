@@ -54,21 +54,21 @@ typedef void (*drawrevline_f)(lipsVMDebug_s* d, unsigned i);
 __private void d_create_surface(lipsVMDebug_s* d){
 	termMultiSurface_s* m = term_multi_surface_ctor(&d->tms, LIPS_DBG_X, LIPS_DBG_Y, LIPS_DBG_SCREEN_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_HEADER_H);
-	term_multi_surface_hsplit(m, LIPS_DBG_HEADER_W);
+	term_multi_surface_hsplit(m, " lips debug - header ", LIPS_DBG_HEADER_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_STACKED_H);
-	term_multi_surface_hsplit(m, LIPS_DBG_STACK_W);
-	term_multi_surface_hsplit(m, LIPS_DBG_CSTACK_W);
-	term_multi_surface_hsplit(m, LIPS_DBG_NODE_W);
-	term_multi_surface_hsplit(m, LIPS_DBG_CAPTURE_W);
-	term_multi_surface_hsplit(m, LIPS_DBG_BREAK_W);
+	term_multi_surface_hsplit(m, " stack ", LIPS_DBG_STACK_W);
+	term_multi_surface_hsplit(m, " call ", LIPS_DBG_CSTACK_W);
+	term_multi_surface_hsplit(m, " node ", LIPS_DBG_NODE_W);
+	term_multi_surface_hsplit(m, " capture ", LIPS_DBG_CAPTURE_W);
+	term_multi_surface_hsplit(m, " break ", LIPS_DBG_BREAK_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_RANGE_H);
-	term_multi_surface_hsplit(m, LIPS_DBG_RANGE_W);
+	term_multi_surface_hsplit(m, " range ", LIPS_DBG_RANGE_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_CODE_H);
-	term_multi_surface_hsplit(m, LIPS_DBG_CODE_W);
+	term_multi_surface_hsplit(m, " code ", LIPS_DBG_CODE_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_PROMPT_H);
-	term_multi_surface_hsplit(m, LIPS_DBG_PROMPT_W);
+	term_multi_surface_hsplit(m, " prompt ", LIPS_DBG_PROMPT_W);
 	term_multi_surface_vsplit(m, LIPS_DBG_INP_H);
-	term_multi_surface_hsplit(m, LIPS_DBG_INP_W);
+	term_multi_surface_hsplit(m, " input ", LIPS_DBG_INP_W);
 	term_multi_surface_apply(m);
 	d->header = &m->line[0].surface[0];
 	d->stack  = &m->line[1].surface[0];
@@ -239,6 +239,7 @@ __private unsigned draw_opcode(lipsVMDebug_s* d, unsigned pc){
 						case OPEV_NODEEX_PARENT : printf("node  parent"); break;
 						case OPEV_NODEEX_DISABLE: printf("node  disable"); break;
 						case OPEV_NODEEX_ENABLE : printf("node  enable"); break;
+						case OPEV_NODEEX_MARK   : printf("node  mark"); break;
 					}
 				break;
 				case OPE_LEAVE: printf("leave"); break;
@@ -501,15 +502,14 @@ void lips_vm_debug(lipsVM_s* vm){
 	term_cls();
 	term_flush();
 	if( m_header(vm->node)->len ){
-		vm->match->ast = lips_ast_make(vm->node, &vm->match->err.last);
-		vm->po = lips_ast_postorder(vm->match->ast);
-		vm->sc = vm->scope;
+		vm->match->ast = lips_ast_make(vm->node);
+		vm->sc         = vm->scope;
 		mforeach(vm->byc->sfase, isf){
-			mforeach(vm->po, in){
+			mforeach(vm->match->ast.marked, in){
 				mforeach(vm->byc->sfase[isf].addr, ia){
 					lips_vm_semantic_reset(vm);
 					vm->pc = vm->byc->sfase[isf].addr[ia];
-					vm->ip = vm->po[in];
+					vm->ip = vm->match->ast.marked[in];
 					while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
 				}
 			}
@@ -569,7 +569,7 @@ __private void ast_dump_file(lipsAst_s* ast, const char** nmap, unsigned tab, FI
 	else{
 		fprintf(f, "<%s> '", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		for( unsigned i = 0; i < ast->len; ++i ){
-			fputs(cast_view_char(ast->sp[i], 0), f);
+			fputs(cast_view_char(ast->tp[i], 0), f);
 		}
 		fputs("'\n", f);
 	}
@@ -577,7 +577,7 @@ __private void ast_dump_file(lipsAst_s* ast, const char** nmap, unsigned tab, FI
 
 __private void dump_dot(lipsAst_s* ast, const char** nmap, FILE* f, const char* parent, unsigned index){
 	__free char* name = str_printf("%s_%s_%d", parent, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id], index);
-	if( *parent ) fprintf(f, "%s -> %s;\n",parent, name);
+	if( ast->parent ) fprintf(f, "%s -> %s;\n", parent, name);
 
 	if( m_header(ast->child)->len ){
 		fprintf(f, "%s [label=\"%s\"];\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
@@ -588,7 +588,7 @@ __private void dump_dot(lipsAst_s* ast, const char** nmap, FILE* f, const char* 
 	else{
 		fprintf(f, "%s [label=\"%s\\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		for( unsigned i = 0; i < ast->len; ++i ){
-			fputs(cast_view_char(ast->sp[i], 0), f);
+			fputs(cast_view_char(ast->tp[i], 0), f);
 		}
 		fprintf(f, "\"];\n");
 	}
@@ -600,11 +600,9 @@ __private void ast_dump_dot(lipsAst_s* ast, const char** nmap, FILE* f){
 	fputs("}\n", f);
 }
 
-void lips_dump_ast(lipsVM_s* vm, FILE* f, int mode){
-	lipsAst_s* root = vm->match->ast;
+void lips_dump_ast(lipsVM_s* vm, lipsAst_s* root, FILE* f, int mode){
 	dbg_info("dump %p", root);
 	if( !root ) return;
-	if( vm->match->count < 0 ) return;
 	switch( mode ){
 		case 0: ast_dump_file(root, vm->byc->fnName, 0, f); break;
 		case 1: ast_dump_dot(root, vm->byc->fnName, f); break;
