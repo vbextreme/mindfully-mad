@@ -36,7 +36,7 @@ typedef struct lipsVMDebug{
 	unsigned           stackLen;
 	uint32_t*          breakpoint;
 	unsigned           brrm;
-	unsigned           brtxt;
+	long               brtxt;
 	unsigned           brsem;
 	dbgState_e         state;
 }lipsVMDebug_s;
@@ -498,7 +498,7 @@ __private dbgState_e debug_exec(lipsVMDebug_s* d){
 	draw_step(d);
 	if( breakpoint_find(d, d->vm->pc) != -1 ) d->state = DBG_STATE_BREAK;
 	if( d->brtxt == d->vm->sp - d->vm->txt ){
-		d->brtxt = 0;
+		d->brtxt = -1;
 		d->state = DBG_STATE_BREAK;
 	}
 	if( d->state == DBG_STATE_STEP ) d->state = DBG_STATE_BREAK;
@@ -524,7 +524,7 @@ void lips_vm_debug(lipsVM_s* vm){
 	d.cinp.argv  = NULL;
 	d.state      = DBG_STATE_BREAK;
 	d.brrm       = 0;
-	d.brtxt      = 0;
+	d.brtxt      = -1;
 	d.brsem      = 0;
 	d.breakpoint = MANY(uint32_t, 16);
 	term_cls();
