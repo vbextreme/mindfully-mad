@@ -231,7 +231,12 @@ __private void on_error(lipsVM_s* vm){
 	if( vm->sp >= vm->match->err.loc && vm->er ){
 		//dbg_info("store error pos %lu num %u", vm->sp-vm->txt, vm->rerr);
 		vm->match->err.number = vm->er;
-		vm->match->err.loc    = vm->sp;
+		if( vm->ip ){
+			vm->match->err.loc = vm->ip->orgtp ? vm->ip->orgtp: vm->ip->tp;
+		}
+		else{
+			vm->match->err.loc    = vm->sp;
+		}
 	}
 }
 
