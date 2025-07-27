@@ -312,6 +312,7 @@ __private void draw_code(lipsVMDebug_s* d){
 __private void draw_step(lipsVMDebug_s* d){
 	term_surface_clear(d->header);
 	term_surface_focus(d->header);
+	term_flush();
 	printf("start:%04X ranges:%u functions:%u codesize: %X stacksize:%u rerr:%u",
 			d->vm->byc->start,
 			d->vm->byc->rangeCount,
@@ -326,6 +327,7 @@ __private void draw_step(lipsVMDebug_s* d){
 	reverse_draw(d, d->node, m_header(d->vm->node)->len, revdraw_node);
 	reverse_draw(d, d->save, d->vm->match->count+1, revdraw_save);
 	reverse_draw(d, d->brk, m_header(d->breakpoint)->len, revdraw_breakpoint);
+	term_flush();
 	term_surface_clear(d->range);
 	draw_input(d, -1);
 	draw_code(d);
@@ -513,9 +515,8 @@ void lips_vm_debug(lipsVM_s* vm){
 	d.breakpoint = MANY(uint32_t, 16);
 	term_cls();
 	term_multi_surface_draw(&d.tms);
-	while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
-	term_cls();
 	term_flush();
+	while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
 	if( m_header(vm->node)->len ){
 		vm->match->ast = lips_ast_make(vm->node);
 		vm->sc         = vm->scope;
@@ -530,6 +531,8 @@ void lips_vm_debug(lipsVM_s* vm){
 			}
 		}
 	}
+	term_cls();
+	term_flush();
 }
 
 void lips_dump_error(lipsVM_s* vm, lipsMatch_s* m, const utf8_t* source, FILE* f){
