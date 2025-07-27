@@ -36,6 +36,7 @@ typedef struct lipsVMDebug{
 	unsigned           stackLen;
 	uint32_t*          breakpoint;
 	unsigned           brrm;
+	unsigned           brtxt;
 	dbgState_e         state;
 }lipsVMDebug_s;
 
@@ -405,6 +406,11 @@ __private void action_breakpoint(lipsVMDebug_s* d){
 	breakpoint_add(d, strtoul(d->cinp.argv[1], NULL, 16));
 }
 
+__private void action_breaktext(lipsVMDebug_s* d){
+	d->brtxt = strtoul(d->cinp.argv[1], NULL, 10);
+	d->state = DBG_STATE_RUN;
+}
+
 __private void action_breakremove(lipsVMDebug_s* d){
 	breakpoint_rm(d, strtoul(d->cinp.argv[1], NULL, 16));
 }
@@ -450,6 +456,11 @@ cmdmap_s CMD[] = {{
 		.act = action_breakremove,
 		.nam = 1
 	},{
+		.shr = "bt",
+		.lng = "breaktext",
+		.act = action_breaktext,
+		.nam = 1
+	},{
 		.shr = "r",
 		.lng = "refresh",
 		.act = action_refresh,
@@ -461,7 +472,7 @@ __private void command_parse(lipsVMDebug_s* d){
 	for( unsigned i = 0; i < sizeof_vector(CMD); ++i ){
 		if( !strcmp(d->cinp.argv[0], CMD[i].shr) || !strcmp(d->cinp.argv[0], CMD[i].lng) ){
 			if( CMD[i].nam == m_header(d->cinp.argv)->len-1 ) CMD[i].act(d);
-			CMD[0].act = CMD[i].act;
+			if( !CMD[i].nam )  CMD[0].act = CMD[i].act;
 			return;
 		}
 	}
@@ -472,6 +483,10 @@ __private dbgState_e debug_exec(lipsVMDebug_s* d){
 	d->curStack = d->stackLen ? d->stackLen - 1: 0;
 	draw_step(d);
 	if( breakpoint_find(d, d->vm->pc) != -1 ) d->state = DBG_STATE_BREAK;
+	if( d->brtxt == d->vm->sp - d->vm->txt ){
+		d->brtxt = 0;
+		d->state = DBG_STATE_BREAK;
+	}
 	if( d->state == DBG_STATE_STEP ) d->state = DBG_STATE_BREAK;
 	while( d->state == DBG_STATE_BREAK ){
 		if( d->brrm ){
