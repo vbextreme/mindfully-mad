@@ -472,7 +472,7 @@ cmdmap_s CMD[] = {{
 		.shr = "bs",
 		.lng = "breaksemantic",
 		.act = action_breaksemantic,
-		.nam = 1
+		.nam = 0
 	},{
 		.shr = "r",
 		.lng = "refresh",
