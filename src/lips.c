@@ -17,6 +17,7 @@ typedef enum{
 	OPT_dump_ast_split,
 	OPT_dot_png,
 	OPT_dump_name_cenum,
+	OPT_builin_lips_emitter,
 	OPT_h
 }options_e;
 
@@ -30,6 +31,7 @@ option_s opt[] = {
 	{'\0', "--dump-ast-split", "dump ast splitted on first multi child"                 ,                          OPT_NOARG, 0, NULL},
 	{'\0', "--dot-png"       , "auto build dot file to png"                             ,                          OPT_NOARG, 0, NULL},
 	{'\0', "--dump-name-enum", "dump grammar name to C enum"                            ,                           OPT_PATH, 0, NULL},
+	{'\0', "--builtin-lips-emitter", "build lips in bytecode"                            ,                           OPT_PATH, 0, NULL},
 	{ 'h', "--help"          , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
 
@@ -154,6 +156,12 @@ int main(int argc, char** argv){
 			if( opt[OPT_dump_name_cenum].set ){
 				FILE* out = argfopen(-1, opt[OPT_dump_name_cenum].value->str, "w");
 				lips_dump_name_cenum(&lbyc, "grammarName", "LGRAM", out);
+				argfclose(out);
+			}
+			if( opt[OPT_builin_lips_emitter].set ){
+				FILE* out = argfopen(-1, opt[OPT_builin_lips_emitter].value->str, "w");
+				uint16_t* b = lips_builtin_emitter(&lbyc, m.ast.root);
+				if( b ) fwrite(b, sizeof(uint16_t), m_header(b)->len, out);
 				argfclose(out);
 			}
 		}
