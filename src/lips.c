@@ -153,7 +153,7 @@ int main(int argc, char** argv){
 			}
 			if( opt[OPT_dump_name_cenum].set ){
 				FILE* out = argfopen(-1, opt[OPT_dump_name_cenum].value->str, "w");
-				lips_dump_name_cenum(&lbyc, "grammarName", out);
+				lips_dump_name_cenum(&lbyc, "grammarName", "LGRAM", out);
 				argfclose(out);
 			}
 		}

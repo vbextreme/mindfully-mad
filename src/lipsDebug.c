@@ -648,10 +648,10 @@ void lips_dump_ast(lipsVM_s* vm, lipsAst_s* root, FILE* f, int mode){
 	fflush(f);
 }
 
-void lips_dump_name_cenum(lipsByc_s* byc, const char* name, FILE* f){
+void lips_dump_name_cenum(lipsByc_s* byc, const char* name, const char* prefix, FILE* f){
 	fprintf(f, "typedef enum{\n");
 	mforeach(byc->name, i){
-		fprintf(f, "\t%s,\n", byc->name[i]);
+		fprintf(f, "\t%s_%s,\n", prefix, byc->name[i]);
 	}
 	fprintf(f, "}%s_e;\n", name);
 }
