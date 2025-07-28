@@ -27,5 +27,6 @@ void lips_vm_debug(lipsVM_s* vm);
 void lips_dump_error(lipsVM_s* vm, lipsMatch_s* m, const utf8_t* source, FILE* f);
 void lips_dump_capture(lipsMatch_s* m, FILE* f);
 void lips_dump_ast(lipsVM_s* vm, lipsAst_s* root, FILE* f, int mode);
+void lips_dump_name_cenum(lipsByc_s* byc, const char* name, FILE* f);
 
 #endif

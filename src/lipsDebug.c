@@ -4,6 +4,11 @@
 #include <inutility.h>
 #include <readline/readline.h>
 
+//TODO
+//input draw overflow
+//code draw overflow
+//debug splith code with ast
+
 typedef enum { 
 	DBG_STATE_QUIT = -1,
 	DBG_STATE_STEP,
@@ -113,7 +118,7 @@ __private void revdraw_cstack(lipsVMDebug_s* d, unsigned sc){
 
 __private void revdraw_node(lipsVMDebug_s* d, unsigned sc){
 	switch( d->vm->node[sc].op ){
-		case OPEV_NODEEX_NEW    : printf(" + [%4u](%3d)%s len:%lu", sc, d->vm->node[sc].id, d->vm->byc->fnName[d->vm->node[sc].id], d->vm->node[sc].sp - d->vm->txt); break;
+		case OPEV_NODEEX_NEW    : printf(" + [%4u](%3d)%s len:%lu", sc, d->vm->node[sc].id, d->vm->byc->name[d->vm->node[sc].id], d->vm->node[sc].sp - d->vm->txt); break;
 		case OPEV_NODEEX_PARENT : printf(" < [%4d] %lu", sc, d->vm->node[sc].sp - d->vm->txt); break;
 		case OPEV_NODEEX_DISABLE: printf(" ~ [%4u]", sc); break;
 		case OPEV_NODEEX_ENABLE : printf(" & [%4u]", sc); break;
@@ -225,8 +230,8 @@ __private unsigned draw_opcode(lipsVMDebug_s* d, unsigned pc){
 		case OP_PUSH  : printf("push  %X -> pc %X", pc + BYTECODE_IVAL11(byc), pc+1); break;
 		case OP_PUSHR : printf("push  %X -> pc %X", pc + 1, pc + BYTECODE_IVAL11(byc)); break;
 		case OP_JMP   : printf("jmp   %X", pc + BYTECODE_IVAL11(byc)); break;
-		case OP_NODE  : printf("node  new::%s::%u", d->vm->byc->fnName[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
-		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), d->vm->byc->fnName[BYTECODE_VAL12(byc)], d->vm->byc->fn[BYTECODE_VAL12(byc)]); break;
+		case OP_NODE  : printf("node  new::%s::%u", d->vm->byc->name[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
+		case OP_CALL  : printf("call  [%u]%s -> %X",BYTECODE_VAL12(byc), d->vm->byc->name[BYTECODE_VAL12(byc)], d->vm->byc->fn[BYTECODE_VAL12(byc)]); break;
 		case OP_ENTER : printf("enter %X",BYTECODE_VAL12(byc)); break;
 		case OP_TYPE  : printf("type  %X",BYTECODE_VAL12(byc)); break;
 		case OP_SYMBOL: printf("symbol %X",BYTECODE_VAL12(byc)); break;
@@ -610,7 +615,7 @@ __private void ast_dump_file(lipsAst_s* ast, const char** nmap, unsigned tab, FI
 
 __private void dump_dot(lipsAst_s* ast, const char** nmap, FILE* f, const char* parent, unsigned index){
 	__free char* name = str_printf("%s_%s_%d", parent, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id], index);
-	if( ast->parent ) fprintf(f, "%s -> %s;\n", parent, name);
+	if( *parent ) fprintf(f, "%s -> %s;\n", parent, name);
 
 	if( m_header(ast->child)->len ){
 		fprintf(f, "%s [label=\"%s\"];\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
@@ -637,10 +642,34 @@ void lips_dump_ast(lipsVM_s* vm, lipsAst_s* root, FILE* f, int mode){
 	dbg_info("dump %p", root);
 	if( !root ) return;
 	switch( mode ){
-		case 0: ast_dump_file(root, vm->byc->fnName, 0, f); break;
-		case 1: ast_dump_dot(root, vm->byc->fnName, f); break;
+		case 0: ast_dump_file(root, vm->byc->name, 0, f); break;
+		case 1: ast_dump_dot(root, vm->byc->name, f); break;
 	}
 	fflush(f);
 }
+
+void lips_dump_name_cenum(lipsByc_s* byc, const char* name, FILE* f){
+	fprintf(f, "typedef enum{\n");
+	mforeach(byc->name, i){
+		fprintf(f, "\t%s,\n", byc->name[i]);
+	}
+	fprintf(f, "}%s_e;\n", name);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

@@ -438,6 +438,7 @@ uint16_t* lcc_make(lcc_s* rc){
 	bc[BYC_RANGE_COUNT]  = m_header(rc->range)->len;
 	bc[BYC_URANGE_COUNT] = m_header(rc->urange)->len;
 	bc[BYC_FN_COUNT]     = m_header(rc->fn)->len;
+	bc[BYC_NAME_COUNT]   = m_header(rc->name)->len + bc[BYC_FN_COUNT];
 	bc[BYC_ERR_COUNT]    = m_header(rc->errstr)->len;
 	bc[BYC_START]        = rc->label[0].address;
 	bc[BYC_CODELEN]      = m_header(rc->bytecode)->len;
@@ -465,7 +466,7 @@ uint16_t* lcc_make(lcc_s* rc){
 	}
 	mforeach(rc->name, i){
 		unsigned len = strlen(rc->name[i])+1;
-		memcpy(inc, rc->fn[i].name, len);
+		memcpy(inc, rc->name[i], len);
 		len = ROUND_UP(len, 2);
 		len /= 2;
 		inc += len;

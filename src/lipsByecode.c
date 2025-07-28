@@ -45,6 +45,7 @@ lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode){
 	byc->rangeCount      = bytecode[BYC_RANGE_COUNT];
 	byc->urangeCount     = bytecode[BYC_URANGE_COUNT];
 	byc->fnCount         = bytecode[BYC_FN_COUNT];
+	byc->nameCount       = bytecode[BYC_NAME_COUNT];
 	byc->errCount        = bytecode[BYC_ERR_COUNT];
 	byc->semanticCount   = bytecode[BYC_SEMANTIC_COUNT];
 	byc->start           = bytecode[BYC_START];
@@ -60,14 +61,14 @@ lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode){
 	byc->range           = &bytecode[byc->sectionRange];
 	byc->urange          = &bytecode[byc->sectionURange];
 	byc->code            = &bytecode[byc->sectionCode];
-	byc->fnName          = map_name(&bytecode[byc->sectionName], byc->fnCount);
+	byc->name            = map_name(&bytecode[byc->sectionName], byc->nameCount);
 	byc->errStr          = map_name(&bytecode[byc->sectionError], byc->errCount);
 	byc->sfase           = map_semantic(&bytecode[byc->sectionSemantic], byc->semanticCount);
 	return byc;
 }
 
 void lipsByc_dtor(lipsByc_s* byc){
-	m_free(byc->fnName);
+	m_free(byc->name);
 	m_free(byc->errStr);
 	mforeach(byc->sfase,i){
 		m_free(byc->sfase[i].addr);
@@ -76,8 +77,8 @@ void lipsByc_dtor(lipsByc_s* byc){
 }
 
 long lipsByc_name_toid(lipsByc_s* byc, const char* name){
-	mforeach(byc->fnName, i){
-		if( !strcmp(byc->fnName[i], name) ) return i;
+	mforeach(byc->name, i){
+		if( !strcmp(byc->name[i], name) ) return i;
 	}
 	return -1;
 }

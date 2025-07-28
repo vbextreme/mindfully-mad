@@ -1,11 +1,11 @@
 #include <notstd/opt.h>
+#include <notstd/str.h>
 #include <fcntl.h>
 #include <inutility.h>
 #include <lips/vm.h>
 #include <lips/builtingram.h>
 #include <lips/bytecode.h>
 #include <lips/debug.h>
-
 
 typedef enum{
 	OPT_g,
@@ -14,6 +14,9 @@ typedef enum{
 	OPT_dump_capture,
 	OPT_dump_ast_file,
 	OPT_dump_ast_dot,
+	OPT_dump_ast_split,
+	OPT_dot_png,
+	OPT_dump_name_cenum,
 	OPT_h
 }options_e;
 
@@ -24,14 +27,18 @@ option_s opt[] = {
 	{'\0', "--dump-capture"  , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
 	{'\0', "--dump-ast-file" , "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
 	{'\0', "--dump-ast-dot"  , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-split", "dump ast splitted on first multi child"                 ,                          OPT_NOARG, 0, NULL},
+	{'\0', "--dot-png"       , "auto build dot file to png"                             ,                          OPT_NOARG, 0, NULL},
+	{'\0', "--dump-name-enum", "dump grammar name to C enum"                            ,                           OPT_PATH, 0, NULL},
 	{ 'h', "--help"          , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
 
-__private FILE* argfopen(const char* path, const char* mode){
+__private FILE* argfopen(long id, const char* path, const char* mode){
 	if( !strcmp(path, "stdout") ) return stdout;
 	if( !strcmp(path, "stderr") ) return stderr;
-	dbg_info("OPEN %s", path);
-	FILE* ret = fopen(path, mode);
+	dbg_info("OPEN %ld.%s", id, path);
+	__free char* p = id != -1 ? str_printf("%ld.%s", id, path): str_dup(path, 0);
+	FILE* ret = fopen(p, mode);
 	if( !ret ) die("unable to open file '%s': %m", path);
 	return ret;
 }
@@ -41,6 +48,11 @@ __private void argfclose(FILE* f){
 	if( f == stderr ) return;
 	if( !f ) return;
 	fclose(f);
+}
+
+__private void dotbuild(long id, const char* fname){
+	__free char* cmd = id == -1? str_printf("dot -Tpng %s -o %s.png", fname, fname): str_printf("dot -Tpng %ld.%s -o %ld.%s.png", id, fname, id, fname);
+	system(cmd);
 }
 
 int main(int argc, char** argv){
@@ -98,23 +110,52 @@ int main(int argc, char** argv){
 		}
 		lips_dump_error(&vm, &m, vm.txt, stderr);
 		if( opt[OPT_dump_capture].set ){
-			FILE* out = argfopen(opt[OPT_dump_capture].value[it].str, "w");
+			FILE* out = argfopen(-1, opt[OPT_dump_capture].value[it].str, "w");
 			lips_dump_capture(&m, out);
 			argfclose(out);
 		}
-	
+		
 		if( m.ast.root ){
+			lipsAst_s* root = m.ast.root;
+			if( opt[OPT_dump_ast_split].set ){
+				while( m_header(root->child)->len == 1 ) root = &root->child[0];
+				if( m_header(root->child)->len == 0 ) root = m.ast.root;
+			}
 			if( opt[OPT_dump_ast_file].set ){
-				FILE* out = argfopen(opt[OPT_dump_ast_file].value[it].str, "w");
-				lips_dump_ast(&vm, m.ast.root, out, 0);
-				argfclose(out);
+				if( opt[OPT_dump_ast_split].set ){
+					mforeach(root->child, i){
+						FILE* out = argfopen(i, opt[OPT_dump_ast_file].value[it].str, "w");
+						lips_dump_ast(&vm, &root->child[i], out, 0);
+						argfclose(out);
+					}
+				}
+				else{
+					FILE* out = argfopen(-1, opt[OPT_dump_ast_file].value[it].str, "w");
+					lips_dump_ast(&vm, m.ast.root, out, 0);
+					argfclose(out);
+				}
 			}
 			if( opt[OPT_dump_ast_dot].set ){
-				FILE* out = argfopen(opt[OPT_dump_ast_dot].value[it].str, "w");
-				lips_dump_ast(&vm, m.ast.root, out, 1);
+				if( opt[OPT_dump_ast_split].set ){
+					mforeach(root->child, i){
+						FILE* out = argfopen(i, opt[OPT_dump_ast_dot].value[it].str, "w");
+						lips_dump_ast(&vm, &root->child[i], out, 1);
+						argfclose(out);
+						if( opt[OPT_dot_png].set ) dotbuild(i, opt[OPT_dump_ast_dot].value[it].str);
+					}
+				}
+				else{
+					FILE* out = argfopen(-1, opt[OPT_dump_ast_dot].value[it].str, "w");
+					lips_dump_ast(&vm, m.ast.root, out, 1);
+					argfclose(out);
+					if( opt[OPT_dot_png].set ) dotbuild(-1, opt[OPT_dump_ast_dot].value[it].str);
+				}
+			}
+			if( opt[OPT_dump_name_cenum].set ){
+				FILE* out = argfopen(-1, opt[OPT_dump_name_cenum].value->str, "w");
+				lips_dump_name_cenum(&lbyc, "grammarName", out);
 				argfclose(out);
 			}
-			//if( eid != -1 ) lips_ast_dtor(dump);
 		}
 	}
 	

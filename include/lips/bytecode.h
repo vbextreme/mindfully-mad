@@ -9,18 +9,19 @@
 #define BYC_RANGE_COUNT      0x02
 #define BYC_URANGE_COUNT     0x03
 #define BYC_FN_COUNT         0x04
-#define BYC_ERR_COUNT        0x05
-#define BYC_SEMANTIC_COUNT   0x06
-#define BYC_START            0x07
-#define BYC_CODELEN          0x08
-#define BYC_SECTION_FN       0x09
-#define BYC_SECTION_NAME     0x0A
-#define BYC_SECTION_ERROR    0x0B
-#define BYC_SECTION_RANGE    0x0C
-#define BYC_SECTION_URANGE   0x0D
-#define BYC_SECTION_SEMANTIC 0x0E
-#define BYC_SECTION_CODE     0x0F
-#define BYC_HEADER_SIZE      0x10
+#define BYC_NAME_COUNT       0x05
+#define BYC_ERR_COUNT        0x06
+#define BYC_SEMANTIC_COUNT   0x07
+#define BYC_START            0x08
+#define BYC_CODELEN          0x09
+#define BYC_SECTION_FN       0x0A
+#define BYC_SECTION_NAME     0x0B
+#define BYC_SECTION_ERROR    0x0C
+#define BYC_SECTION_RANGE    0x0D
+#define BYC_SECTION_URANGE   0x0E
+#define BYC_SECTION_SEMANTIC 0x0F
+#define BYC_SECTION_CODE     0x10
+#define BYC_HEADER_SIZE      0x11
 
 #define BYTECODE_CMD40(BYTECODE)  ((BYTECODE)&0xF000)
 #define BYTECODE_CMD04(BYTECODE)  ((BYTECODE)&0x0F00)
@@ -82,7 +83,7 @@ typedef struct lipsByc{
 	uint16_t*    range;
 	uint16_t*    urange;
 	uint16_t*    code;
-	const char** fnName;
+	const char** name;
 	const char** errStr;
 	lipsSFase_s* sfase;
 	uint16_t     format;
@@ -90,6 +91,7 @@ typedef struct lipsByc{
 	uint16_t     rangeCount;
 	uint16_t     urangeCount;
 	uint16_t     fnCount;
+	uint16_t     nameCount;
 	uint16_t     errCount;
 	uint16_t     semanticCount;
 	uint16_t     start;
