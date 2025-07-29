@@ -71,6 +71,10 @@ CF: RET -1
 CALL FN; push pc+1
        ; push pc[FN]
 MATCH
+
+TODO
+ {1} exact
+ {m,M} min Max
 */
 
 __private void stk_push(lipsVM_s* vm, unsigned pc){

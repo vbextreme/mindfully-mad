@@ -19,8 +19,9 @@ num@[2]   : /[0-9]+/;
 lnum      : num;
 rnum      : num;
 qtype     : /[\*\+\?]/;
+lazy      : /\?/
 qspec     : /\{/ lnum (/,/ rnum?)? /\}/;
-quantifier@[4]: qtype
+quantifier@[4]: qtype lazy?
               | qspec
               ;
 
@@ -30,7 +31,8 @@ rx_char@[5]: rx_escaped
            | rx_literal
            ;
 rx_range   : rx_char (/-/ rx_char)?;
-rx_class@[6]: /\[/ rx_range+ /\]/;
+rx_class_rev: /\^/
+rx_class@[6]: /\[/ rx_class_rev? rx_range+ /\]/;
 
 rx_begin : /\^/;
 rx_end   : /\$/;
@@ -190,6 +192,11 @@ __private void def_qtype(lcc_s* lc){
 	token_class(lc, "qtype", "*+?", 0, 1, 0,  0);
 }
 
+//lazy      : /\?/
+__private void def_lazy(lcc_s* lc){
+	token_char(lc, "lazy", "?", 1, 0);
+}
+
 //qspec     : /{/ lnum (/,/ rnum?)? /}/;
 __private void def_qspec(lcc_s* lc){
 	INIT(lc);
@@ -204,7 +211,7 @@ __private void def_qspec(lcc_s* lc){
 	}
 }
 
-//quantifier@[4]: qtype
+//quantifier@[4]: qtype lazy?
 //          | qspec
 //          ;
 __private void def_quantifier(lcc_s* lc){
@@ -213,6 +220,7 @@ __private void def_quantifier(lcc_s* lc){
 		MARK();
 		OR2(
 			CALL("qtype");
+			ZOQ(CALL("lazy"););
 		,
 			CALL("qspec");
 		);
@@ -262,11 +270,17 @@ __private void def_rx_range(lcc_s* lc){
 	}
 }
 
-//rx_class@[6]: '[' rx_range+ ']';
+//rx_class_rev: /\^/
+__private void def_rx_class_rev(lcc_s* lc){
+	token_char(lc, "rx_class_rev", "^", 1, 0);
+}
+
+//rx_class@[6]: /\[/ rx_class_rev? rx_range+ /\]/;
 __private void def_rx_class(lcc_s* lc){
 	INIT(lc);
 	FN("rx_class", 1, 6){
 		CHAR('[');
+		ZOQ(CALL("rx_class_rev"););
 		OMQ(
 			CALL("rx_range");
 		);
@@ -380,7 +394,7 @@ __private void def_comment(lcc_s* lc){
 	RRSET('\n');
 	RRREV();
 	unsigned r = RRADD();
-	FN("comment", 1, 0){
+	FN("comment", 0, 0){
 		CALL("skip");
 		CHAR('#');
 		ZMQ(RANGE(r););
@@ -761,7 +775,7 @@ __private void def_lips(lcc_s* lc){
 	}
 }
 
-//grammar_end-@: skip /\0/;
+//grammar_end-!: skip /\0/;
 __private void def_grammar_end(lcc_s* lc){
 	INIT(lc);
 	FN("grammar_end", 0, 0){
@@ -935,6 +949,7 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_num(ROBJ());
 	def_lnum(ROBJ());
 	def_rnum(ROBJ());
+	def_lazy(ROBJ());
 	def_qtype(ROBJ());
 	def_qspec(ROBJ());
 	def_quantifier(ROBJ());
@@ -943,6 +958,7 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_rx_escaped(ROBJ());
 	def_rx_char(ROBJ());
 	def_rx_range(ROBJ());
+	def_rx_class_rev(ROBJ());
 	def_rx_class(ROBJ());
 	def_rx_begin(ROBJ());
 	def_rx_end(ROBJ());

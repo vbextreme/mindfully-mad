@@ -17,9 +17,10 @@
 num@[2]   : /[0-9]+/;
 lnum      : num;
 rnum      : num;
+lazy      : /\?/
 qtype     : /[\*\+\?]/;
 qspec     : /\{/ lnum (/,/ rnum?)? /\}/;
-quantifier@[4]: qtype
+quantifier@[4]: qtype lazy?
               | qspec
               ;
 
@@ -29,7 +30,8 @@ rx_char@[5]: rx_escaped
            | rx_literal
            ;
 rx_range   : rx_char (/-/ rx_char)?;
-rx_class@[6]: /\[/ rx_range+ /\]/;
+rx_class_rev: /\^/
+rx_class@[6]: /\[/ rx_class_rev? rx_range+ /\]/;
 
 rx_begin : /\^/;
 rx_end   : /\$/;

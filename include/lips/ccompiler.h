@@ -23,6 +23,7 @@ typedef struct lccfn{
 	unsigned addr;
 	char*    name;
 	unsigned fail;
+	uintptr_t userctx;
 }lccfn_s;
 
 typedef struct lccSFase{
