@@ -79,33 +79,33 @@ rule_altern : rule_concat ( skip /\|/ rule_concat )*;
 rule@[12]   : rule_def skip rule_altern rule_end;
 
 @error[14] 'aspected quoted value';
-@error[15] 'invalid query type';
-@error[16] 'invalid query';
-@error[17] 'invalid operation, aspected promotion, symbol or query';
+@error[15] 'aspected valid node';
+@error[16] 'invalid operation, aspected promotion, symbol or set value';
+@error[17] 'invalid query';
 @error[18] 'invalid child';
-@error[19] 'invalid semantic';
+@error[19] 'invalid semantic rule';
 
-sem_value@[14] : /=/ quoted;
-sem_def        : word sem_value?;
-sem_promote    : />/ sem_def;
-sem_symbol     : /\+/ sem_def;
-query_node     : word;
-query_value    : quoted;
-query_type@[15]: query_node
-               | query_value
-               | rule_binerr
-               ;
-sem_query@[16] : /\?\(/ query_type ( /\|/ query_type )* /\)/ sem_op?;
-sem_op@[17]    : sem_promote
-               | sem_symbol
-               | sem_query
-               ;
-sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ sem_op? skip;
-sem_altern     : skip word sem_op? sem_child*;
-sem_concat     : sem_altern+;
-sem_rule       : sem_concat;
-sem_stage      : /\[/ num /\]/;
-semantic@[19]  : /%/ ( sem_stage | sem_rule ) rule_end;
+sem_value@[14]  : /=/ skip quoted;
+sem_promote@[15]: /\^/ skip word;
+sem_symbol@[15] : /\+/ skip word;
+sem_change@[16] : sem_promote
+                | sem_symbol
+                | sem_value
+                ;
+sem_query@[17]  : /\?/ skip (word | quoted);
+sem_primary     : sem_change
+                | sem_query
+                | sem_altern
+                ;
+sem_enter       : skip /\(/ skip sem_primary skip /\)/ skip;
+sem_child@[18]  : skip word sem_enter?;
+sem_repeat      : sem_child 
+                | rule_binerr;
+sem_concat      : sem_repeat+;
+sem_altern      : sem_concat ( skip /\|/ sem_concat )*;
+sem_rule        : skip word sem_enter;
+sem_stage       : /\[/ num /\]/;
+semantic@[19]   : /%/ ( sem_stage | sem_rule ) rule_end;
 
 lips@[13]: builtin_error
          | rule
@@ -121,13 +121,47 @@ grammar: regex
 
 _start_: (skip grammar @[0])+;
 
-%[0];
-%rule_def(word+ruleName);
-%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
-%builtin_error(num+ErrNum);
-%[1];
-%rule_primary(word?(ruleName|@[20])>call);
-%rule_binerr(num?(ErrNum|@[21]));
+%[0]
+
+%ruledef(
+	word(+ruleName)
+);
+
+%quantifier(
+	qspec(
+		lnum(?'0')
+		rnum(?'1')
+		^qtype
+		='?'
+    )
+);
+
+%builtin_error(
+	num(+ErrNum)
+);
+
+%grammar(
+	lips
+	|
+	@[22]
+);
+
+%[1]
+
+%rule_primary(
+	word(
+		?ruleName
+		^call
+	)
+	|
+	@[20]
+);
+
+%rule_binerr(
+	num(?ErrNum)
+	|
+	@[21]
+);
 
 TODO
 ##semantic
@@ -142,6 +176,7 @@ $- scope leave
 $[0]>rule_primary>~call: > call $word
 
 */
+
 __private void token_class(lcc_s* lc, const char* fnname, const char* accept, unsigned rev, unsigned store, unsigned mode, unsigned err){
 	INIT(lc);
 	USERANGE();

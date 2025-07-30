@@ -1,135 +1,185 @@
 # LIPS GRAMMAR
 
-@error[1]  'aspected char \':\', declare new rule';
-@error[2]  'invalid number';
-@error[3]  'required ; at end of rule';
-@error[4]  'invalid quantifier';
-@error[5]  'invalid char';
-@error[6]  'invalid range';
-@error[7]  'invalid group';
-@error[8]  'invalid primary';
-@error[9]  'invalid quoted string';
-@error[10] 'invalid regex';
-@error[11] 'invalid rule flags';
-@error[12] 'invalid rule';
-@error[13] 'invalid lips';
+#section.generic
+num@['invalid number']                 : /[0-9]+/;
+comment-                               : skip /#[^\n]*\n/;
+sep-                                   : /[ \t\n]+/;
+skip-                                  : /[ \t\n]* /;
+rule_end-@['required ; at end of rule']: skip /\;/;
+quoted@['invalid quoted string']       : /'(?:[^\\']|\\.)*'/;
+word                                   : /[a-zA-Z_][a-zA-Z_0-9]* /;
 
-num@[2]   : /[0-9]+/;
-lnum      : num;
-rnum      : num;
-lazy      : /\?/
-qtype     : /[\*\+\?]/;
-qspec     : /\{/ lnum (/,/ rnum?)? /\}/;
-quantifier@[4]: qtype lazy?
-              | qspec
-              ;
+#section error
+errdef@['invalid error definition']: /@\[/ (word|quoted) /\]/;
 
-rx_literal : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
-rx_escaped : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
-rx_char@[5]: rx_escaped
-           | rx_literal
-           ;
-rx_range   : rx_char (/-/ rx_char)?;
-rx_class_rev: /\^/
-rx_class@[6]: /\[/ rx_class_rev? rx_range+ /\]/;
+#section.quantifier
+lnum                             : num;
+rnum                             : num;
+lazy                             : /\?/
+qtype                            : /[\*\+\?]/;
+qspec                            : /\{/ lnum (/,/ rnum?)? /\}/;
+quantifier@['invalid quantifier']: qtype lazy?
+                                 | qspec
+                                 ;
 
-rx_begin : /\^/;
-rx_end   : /\$/;
-rx_any   : /./;
+#section.regex
+rx_literal                    : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
+rx_escaped                    : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\;\/tn]/;
+rx_char@['invalid char']      : rx_escaped
+                              | rx_literal
+                              ;
+rx_range                      : rx_char (/-/ rx_char)?;
+rx_class_rev                  : /\^/
+rx_class@['invalid range']    : /\[/ rx_class_rev? rx_range+ /\]/;
+rx_begin                      : /\^/;
+rx_end                        : /\$/;
+rx_any                        : /./;
+rx_unnamed                    : /\?:/;
+rx_group@['invalid group']    : /\(/ rx_unnamed? rx_altern /\)/;
+rx_primary@['invalid primary']: rx_literal
+                              | rx_escaped
+                              | rx_group
+                              | rx_class
+                              | rx_any
+                              ;
+rx_repeat                     : rx_primary quantifier?;
+rx_concat                     : rx_repeat+;
+rx_altern                     : rx_concat ( /\|/ rx_concat )*;
+regex@['invalid regex']       : /\// rx_begin? rx_altern rx_end? /\//;
 
-rx_unnamed: /\?:/;
-rx_group@[7]: /\(/ rx_unnamed? rx_altern /\)/;
-rx_primary@[8]: rx_literal
-              | rx_escaped
-              | rx_group
-              | rx_class
-              | rx_any
-              ;
+#section.syntax
+syntax_unstore                                  : /-/;
+syntax_match                                    : /!/;
+syntax_start@['aspected syntax rule definition']: /:/;
+syntax_flags@['invalid syntax flag']            : unstore? match? errdef?;
+syntax_def                                      : skip word syntax_flags skip syntax_start;
+syntax_group@['invalid group']                  : /\(/ skip syntax_altern skip /\)/;
+syntax_primary                                  : regex
+                                                | syntax_group
+                                                | errdef
+                                                | word
+                                                ;
+syntax_repeat                                   : skip syntax_primary quantifier?;
+syntax_concat                                   : syntax_repeat+;
+syntax_altern                                   : syntax_concat ( skip /\|/ syntax_concat )*;
+syntax@['invalid syntax rule']                  : rule_def skip rule_altern rule_end;
 
-rx_repeat : rx_primary quantifier?;
-rx_concat : rx_repeat+;
-rx_altern : rx_concat ( /\|/ rx_concat )*;
-regex@[10]: /\// rx_begin? rx_altern rx_end? /\//;
+#section.semantic
+semantic_value@['aspected quoted value']                                       : /=/ skip quoted;
+semantic_promote@['aspected valid node']                                       : /\^/ skip word;
+semantic_symbol@[semantic_promote]                                             : /\+/ skip word;
+semantic_senter                                                                : /\+/;
+semantic_sleave                                                                : /\-/;
+semantic_scope@['invalid scope']                                               : /$/ (semantic_senter|semantic_sleave);
+semantic_change@['invalid operation, aspected promotion, symbol or set value'] : semantic_promote
+                                                                               | semantic_symbol
+                                                                               | semantic_value
+                                                                               ;
+semantic_query@['invalid query']                                               : /\?/ skip (word | quoted);
+semantic_primary                                                               : semantic_change
+                                                                               | semantic_query
+                                                                               | semantic_altern
+                                                                               ;
+semantic_enter                                                                 : skip /\(/ skip semantic_primary skip /\)/ skip;
+semantic_child@['invalid child']                                               : skip word semantic_enter?;
+semantic_repeat                                                                : semantic_child 
+                                                                               | errdef;
+semantic_concat                                                                : semantic_repeat+;
+semantic_altern                                                                : semantic_concat ( skip /\|/ semantic_concat )*;
+semantic_rule                                                                  : skip word semantic_enter;
+semantic_stage                                                                 : /\[/ num /\]/;
+semantic@['invalid semantic rule']                                             : /%/ ( semantic_stage | semantic_rule ) rule_end;
 
-comment-  : skip /#[^\n]*\n/;
-sep-      : /[ \t\n]+/;
-skip-     : /[ \t\n]* /;
-rule_end-@[3]: skip /\;/;
-unstore   : /-/;
-match     : /!/;
-rulestart@[1] : /:/;
-word      : /[a-zA-Z_][a-zA-Z_0-9]* /;
-quoted@[9]: /'(?:[^\\']|\\.)*'/;
+#section.lips
+lips@['invalid lips rule']: builtin_error
+                          | syntax
+                          | semantic
+                          ;
+grammar_end-!             : skip  /\0/;
+grammar                   : regex
+                          | lips
+                          | comment
+                          | grammar_end
+                          ;
+_start_                   : (skip grammar @[0])+;
 
-builtin_error: /@ERROR\[/ num /\]/ sep quoted rule_end;
+#semantic.anal yzer
+%[0]
 
-rule_binerr : /@\[/ num /\]/;
-rule_flags@[11]: unstore? match? rule_binerr?;
-rule_def       : skip word rule_flags skip rulestart;
-rule_group@[7]: /\(/ skip rule_altern skip /\)/;
-rule_primary@[8]: regex
-                | rule_group
-                | rule_binerr
-                | word
-                ;
-rule_repeat : skip rule_primary quantifier?;
-rule_concat : rule_repeat+;
-rule_altern : rule_concat ( skip /\|/ rule_concat )*;
-rule@[12]   : rule_def skip rule_altern rule_end;
+%ruledef(
+	word(+ruleName)
+);
 
-@error[14] 'aspected quoted value';
-@error[15] 'invalid query type';
-@error[16] 'invalid query';
-@error[17] 'invalid operation, aspected promotion, symbol or query';
-@error[18] 'invalid child';
-@error[19] 'invalid semantic';
+%quantifier(
+	qspec(
+		lnum(?'0')
+		rnum(?'1')
+		^qtype
+		='?'
+    )
+);
 
-sem_value@[14] : /=/ quoted;
-sem_def        : word sem_value?;
-sem_promote    : />/ sem_def;
-sem_symbol     : /\+/ sem_def;
-query_node     : word;
-query_value    : quoted;
-query_type@[15]: query_node
-               | query_value
-               | rule_binerr
-               ;
-sem_query@[16] : /\?\(/ query_type ( /\|/ query_type )* /\)/ sem_op?;
-sem_op@[17]    : sem_promote
-               | sem_symbol
-               | sem_query
-               ;
-sem_child@[18] : skip /\(/ skip sem_concat skip /\)/ sem_op? skip;
-sem_altern     : skip word sem_op? sem_child*;
-sem_concat     : sem_altern+;
-sem_rule       : sem_concat;
-sem_stage      : /\[/ num /\]/;
-semantic@[19]  : /%/ ( sem_stage | sem_rule ) rule_end;
+%builtin_error(
+	num(+ErrNum)
+);
 
-lips@[13]: builtin_error
-         | rule
-         | semantic
-         ;
+%grammar(
+	lips
+	|
+	@['grammar accepted only lips rule']
+);
 
-grammar_end-!: skip  /\0/;
-grammar: regex
-       | lips
-       | comment
-       | grammar_end
-       ;
+%[1]
 
-_start_: (skip grammar @[0])+;
+%rule_primary(
+	word(
+		?ruleName
+		^call
+	)
+	|
+	@['unable call rule, rule is not declared']
+);
 
-@error[20] 'rule is not defined';
-@error[21] 'undefined error number';
+%rule_binerr(
+	word(?ruleName)
+	|
+	@['required a syntax rule name']
+);
 
-%[0];
-%rule_def(word+ruleName);
-%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
-%builtin_error(num+ErrNum);
 
-%[1];
-%rule_primary(word?(ruleName|@[20])>call);
-%rule_binerr(num?(ErrNum|@[21]));
 
-#end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

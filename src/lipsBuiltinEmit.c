@@ -188,8 +188,13 @@ __private void emit_rule_def(emit_s* e, lipsAst_s* n){
 	long binErr = 0;
 	unsigned te = test_token_find(n, LGRAM_rule_binerr);
 	if( te ) binErr = get_token_unsigned(e, &n->child[--te], 0, LGRAM_num);
-	lcc_fn_prolog(&e->lc, (const char*)name, len, ctx&1, binErr);
-	e->lc.fn[e->lc.currentFN].userctx = ctx;
+	if( strncmp((const char*)name, "_start_", len) ){
+		lcc_start(&e->lc, 0);
+	}
+	else{
+		lcc_fn_prolog(&e->lc, (const char*)name, len, ctx&1, binErr);
+		e->lc.fn[e->lc.currentFN].userctx = ctx;
+	}
 }
 
 __private void emit_rx_class(emit_s* e, lipsAst_s* n){
@@ -291,16 +296,17 @@ __private void emit_rule(emit_s* e, lipsAst_s* n){
 	lcc_fn_epilog(&e->lc, flags & 1);
 }
 
+__private void emit_semantic(emit_s* e, lipsAst_s* n){
+
+}
+
 __private void emit_lips(emit_s* e, lipsAst_s* n){
 	mforeach( n->child, j ){
 		switch( n->child[j].id ){
+			default                 : die("emit: unknow rule %s in as child of lips", e->byc->name[n->child[j].id]);
 			case LGRAM_builtin_error: emit_builtin_error(e, &n->child[j]); break;
 			case LGRAM_rule         : emit_rule(e, &n->child[j]); break;
-			case LGRAM_semantic:
-
-			break;
-			
-			default: die("emit: unknow rule %s in as child of lips", e->byc->name[n->child[j].id]);
+			case LGRAM_semantic     : emit_semantic(e, &n->child[j]); break;
 		}
 	}
 }
@@ -327,9 +333,8 @@ uint16_t* lips_builtin_emitter(lipsByc_s* byc, lipsAst_s* ast){
 	emit.save = 2;
 	lcc_ctor(&emit.lc);
 	emit_grammar(&emit, emit.ast);
-	//uint16_t* ret = lcc_make(&emit.lc);
-	//if( !ret ) lcc_err_die(&emit.lc);
-	//lcc_dtor(&emit.lc);
-	//return ret;
-	return NULL;
+	uint16_t* ret = lcc_make(&emit.lc);
+	if( !ret ) lcc_err_die(&emit.lc);
+	lcc_dtor(&emit.lc);
+	return ret;
 }
