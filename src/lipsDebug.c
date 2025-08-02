@@ -610,7 +610,7 @@ __private void ast_dump_file(lipsAst_s* ast, const char** nmap, unsigned tab, FI
 	if( m_header(ast->child)->len ){
 		fprintf(f, "<%s>\n", ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		mforeach(ast->child,i){
-			ast_dump_file(&ast->child[i], nmap, tab+1, f);
+			ast_dump_file(ast->child[i], nmap, tab+1, f);
 		}
 	}
 	else{
@@ -629,7 +629,7 @@ __private void dump_dot(lipsAst_s* ast, const char** nmap, FILE* f, const char* 
 	if( m_header(ast->child)->len ){
 		fprintf(f, "%s [label=\"%s\"];\n", name, ast->id == LIPS_NODE_START ? "_start_": nmap[ast->id]);
 		mforeach(ast->child,i){
-			dump_dot(&ast->child[i], nmap, f, name, i);
+			dump_dot(ast->child[i], nmap, f, name, i);
 		}
 	}
 	else{

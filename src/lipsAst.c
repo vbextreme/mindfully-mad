@@ -1,17 +1,27 @@
 #include <lips/ast.h>
 
+__private lipsAst_s* ast_node_new(lipsAst_s* parent, lipsAsl_s* node){
+	lipsAst_s* n = NEW(lipsAst_s);
+	n->parent = parent;
+	n->orgtp  = NULL;
+	n->orglen = 0;
+	n->child  = MANY(lipsAst_s*, 1);
+	if( node ){
+		n->tp = node->sp;
+		n->id = node->id;
+	}
+	else{
+		n->id = LIPS_NODE_START;
+		n->tp = NULL;
+	}
+	return n;
+}
+
 lipsAstMatch_s lips_ast_make(lipsAsl_s* node){
 	lipsAstMatch_s m;
 	m.last   = NULL;
 	m.marked = MANY(lipsAst_s*, 32);
-	m.root    = NEW(lipsAst_s);
-	m.root->tp     = 0;
-	m.root->orgtp  = 0;
-	m.root->len    = 0;
-	m.root->orglen = 0;
-	m.root->id     = LIPS_NODE_START;
-	m.root->parent = NULL;
-	m.root->child  = MANY(lipsAst_s, 2);
+	m.root   = ast_node_new(NULL, NULL);
 	lipsAst_s* current = m.root;
 	unsigned j;
 	unsigned n;
@@ -23,14 +33,8 @@ lipsAstMatch_s lips_ast_make(lipsAsl_s* node){
 			case OPEV_NODEEX_NEW:
 				if( disable ) break;
 				j = m_ipush(&current->child);
-				current->child[j].id     = node[i].id;
-				current->child[j].tp     = node[i].sp;
-				current->child[j].len    = 0;
-				current->child[j].orgtp  = NULL;
-				current->child[j].orglen = 0;
-				current->child[j].parent = current;
-				current->child[j].child  = MANY(lipsAst_s, 1);
-				current = &current->child[j];
+				current->child[j] = ast_node_new(current, &node[i]);
+				current = current->child[j];
 			break;
 			case OPEV_NODEEX_PARENT:
 				if( disable ) break;
@@ -40,10 +44,8 @@ lipsAstMatch_s lips_ast_make(lipsAsl_s* node){
 			case OPEV_NODEEX_ENABLE:
 				iassert(disable);
 				--disable;
-			break;
-			
+			break;	
 			case OPEV_NODEEX_DISABLE: ++disable; break;
-			
 			case OPEV_NODEEX_MARK:
 				n = m_ipush(&m.marked);
 				m.marked[n] = current;
@@ -56,15 +58,15 @@ lipsAstMatch_s lips_ast_make(lipsAsl_s* node){
 
 __private void recast_dtor(lipsAst_s* node){
 	mforeach(node->child, i){
-		recast_dtor(&node->child[i]);
+		recast_dtor(node->child[i]);
 	}
 	m_free(node->child);
+	m_free(node);
 }
 
 void lips_ast_dtor(lipsAst_s* node){
 	if( !node ) return;
 	recast_dtor(node);
-	m_free(node);
 }
 
 void lips_ast_match_dtor(lipsAstMatch_s* m){
@@ -74,7 +76,7 @@ void lips_ast_match_dtor(lipsAstMatch_s* m){
 
 lipsAst_s* lips_ast_child_id(lipsAst_s* node, unsigned id){
 	mforeach(node->child, i){
-		if( node->child[i].id == id ) return &node->child[i];
+		if( node->child[i]->id == id ) return node->child[i];
 	}
 	return NULL;
 }

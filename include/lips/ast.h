@@ -11,13 +11,13 @@ typedef struct lipsAsl{
 }lipsAsl_s;
 
 typedef struct lipsAst{
-	struct lipsAst* parent;
-	struct lipsAst* child;
-	const utf8_t*   tp;
-	unsigned        len;
-	uint16_t        id;
-	const utf8_t*   orgtp;
-	unsigned        orglen;
+	struct lipsAst*  parent;
+	struct lipsAst** child;
+	const utf8_t*    tp;
+	unsigned         len;
+	uint16_t         id;
+	const utf8_t*    orgtp;
+	unsigned         orglen;
 }lipsAst_s;
 
 typedef struct lipsAstMatch{

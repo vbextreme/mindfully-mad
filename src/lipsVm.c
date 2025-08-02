@@ -344,7 +344,7 @@ int lips_vm_exec(lipsVM_s* vm){
 		case OP_NODE: op_node(vm, OPEV_NODEEX_NEW, BYTECODE_VAL12(byc)); break;
 	
 		case OP_ENTER:
-			vm->ip = lips_ast_child_id(vm->ip, BYTECODE_VAL12(byc));
+			if( vm->ip ) vm->ip = lips_ast_child_id(vm->ip, BYTECODE_VAL12(byc));
 			if( !vm->ip ) return stk_pop(vm);
 		break;
 		

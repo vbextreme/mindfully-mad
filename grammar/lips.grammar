@@ -15,7 +15,7 @@ errdef@['invalid error definition']: /@\[/ (word|quoted) /\]/;
 #section.quantifier
 lnum                             : num;
 rnum                             : num;
-lazy                             : /\?/
+lazy                             : /\?/;
 qtype                            : /[\*\+\?]/;
 qspec                            : /\{/ lnum (/,/ rnum?)? /\}/;
 quantifier@['invalid quantifier']: qtype lazy?
@@ -29,7 +29,7 @@ rx_char@['invalid char']      : rx_escaped
                               | rx_literal
                               ;
 rx_range                      : rx_char (/-/ rx_char)?;
-rx_class_rev                  : /\^/
+rx_class_rev                  : /\^/;
 rx_class@['invalid range']    : /\[/ rx_class_rev? rx_range+ /\]/;
 rx_begin                      : /\^/;
 rx_end                        : /\$/;

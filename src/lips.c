@@ -111,7 +111,10 @@ int main(int argc, char** argv){
 		else{
 			lips_vm_match(&vm);
 		}
-		lips_dump_error(&vm, &m, vm.txt, stderr);
+		if( m.count < 1 ){
+			lips_dump_error(&vm, &m, vm.txt, stderr);
+			return 0;
+		}
 		if( opt[OPT_dump_capture].set ){
 			FILE* out = argfopen(-1, opt[OPT_dump_capture].value[it].str, "w");
 			lips_dump_capture(&m, out);
@@ -121,14 +124,14 @@ int main(int argc, char** argv){
 		if( m.ast.root ){
 			lipsAst_s* root = m.ast.root;
 			if( opt[OPT_dump_ast_split].set ){
-				while( m_header(root->child)->len == 1 ) root = &root->child[0];
+				while( m_header(root->child)->len == 1 ) root = root->child[0];
 				if( m_header(root->child)->len == 0 ) root = m.ast.root;
 			}
 			if( opt[OPT_dump_ast_file].set ){
 				if( opt[OPT_dump_ast_split].set ){
 					mforeach(root->child, i){
 						FILE* out = argfopen(i, opt[OPT_dump_ast_file].value[it].str, "w");
-						lips_dump_ast(&vm, &root->child[i], out, 0);
+						lips_dump_ast(&vm, root->child[i], out, 0);
 						argfclose(out);
 					}
 				}
@@ -142,7 +145,7 @@ int main(int argc, char** argv){
 				if( opt[OPT_dump_ast_split].set ){
 					mforeach(root->child, i){
 						FILE* out = argfopen(i, opt[OPT_dump_ast_dot].value[it].str, "w");
-						lips_dump_ast(&vm, &root->child[i], out, 1);
+						lips_dump_ast(&vm, root->child[i], out, 1);
 						argfclose(out);
 						if( opt[OPT_dot_png].set ) dotbuild(i, opt[OPT_dump_ast_dot].value[it].str);
 					}
