@@ -135,7 +135,7 @@ void lcc_err_die(lcc_s* lc);
 #define NDISABLE()  do{ lcc_nodeex(_lcc, OPEV_NODEEX_DISABLE); }while(0)
 #define NENABLE()   do{ lcc_nodeex(_lcc, OPEV_NODEEX_ENABLE); }while(0)
 #define MARK()   do{ lcc_nodeex(_lcc, OPEV_NODEEX_MARK); }while(0)
-#define FN(N, STRE,ERR) for( int _tmp = lcc_fn_prolog(_lcc, N, strlen(N), STRE, 0, ERR, strlen(ERR)); _tmp; _tmp = lcc_fn_epilog(_lcc, STRE) )
+#define FN(N, STRE,ERR) for( int _tmp = lcc_fn_prolog(_lcc, N, strlen(N), STRE, 0, ERR, ERR?strlen(ERR):0); _tmp; _tmp = lcc_fn_epilog(_lcc, STRE) )
 #define CALLI(ID)   do{ lcc_calli(_lcc, ID); }while(0)
 #define CALL(N)     do{ lcc_call(_lcc, N, strlen(N)); }while(0)
 #define RET(ID)     do{ lcc_ret(_lcc); }while(0)

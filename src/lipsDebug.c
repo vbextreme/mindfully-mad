@@ -548,7 +548,7 @@ int lips_vm_match_debug(lipsVM_s* vm){
 					lips_vm_semantic_reset(vm);
 					vm->pc = vm->byc->sfase[isf].addr[ia];
 					vm->ip = vm->match->ast.marked[in];
-					int test;
+					int test = 0;
 					while( debug_exec(&d) != DBG_STATE_QUIT && (test=lips_vm_exec(d.vm))>0 );
 					if( test < 0 ) {
 						ret = 0;
