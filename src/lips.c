@@ -161,8 +161,8 @@ int main(int argc, char** argv){
 			}
 			if( opt[OPT_builin_lips_emitter].set ){
 				FILE* out = argfopen(-1, opt[OPT_builin_lips_emitter].value->str, "w");
-				uint16_t* b = lips_builtin_emitter(&lbyc, m.ast.root);
-				if( b ) fwrite(b, sizeof(uint16_t), m_header(b)->len, out);
+				//uint16_t* b = lips_builtin_emitter(&lbyc, m.ast.root);
+				//if( b ) fwrite(b, sizeof(uint16_t), m_header(b)->len, out);
 				argfclose(out);
 			}
 		}

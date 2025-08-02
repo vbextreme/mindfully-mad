@@ -3,6 +3,7 @@
 #include <lips/ccompiler.h>
 #include "lipsGrammarNameEnum.h"
 
+/*
 typedef struct emit{
 	lipsByc_s* byc;
 	lcc_s      lc;
@@ -338,3 +339,5 @@ uint16_t* lips_builtin_emitter(lipsByc_s* byc, lipsAst_s* ast){
 	lcc_dtor(&emit.lc);
 	return ret;
 }
+
+*/
