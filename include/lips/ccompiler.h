@@ -23,6 +23,7 @@ typedef struct lccfn{
 	unsigned addr;
 	char*    name;
 	unsigned fail;
+	unsigned iderr;
 	uintptr_t userctx;
 }lccfn_s;
 
@@ -87,7 +88,7 @@ lcc_s* lcc_node(lcc_s* rc, uint16_t id);
 lcc_s* lcc_nodeex(lcc_s* rc, lipsOP_e nop);
 long lcc_fn(lcc_s* rc, const char* name, unsigned len);
 lcc_s* lcc_ret(lcc_s* rc);
-int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error);
+int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error, const char* errorstr, unsigned errlen);
 int lcc_fn_epilog(lcc_s* rc, unsigned stored);
 int lcc_calli(lcc_s* rc, unsigned ifn);
 lcc_s* lcc_call(lcc_s* rc, const char* name, unsigned len);
@@ -134,7 +135,7 @@ void lcc_err_die(lcc_s* lc);
 #define NDISABLE()  do{ lcc_nodeex(_lcc, OPEV_NODEEX_DISABLE); }while(0)
 #define NENABLE()   do{ lcc_nodeex(_lcc, OPEV_NODEEX_ENABLE); }while(0)
 #define MARK()   do{ lcc_nodeex(_lcc, OPEV_NODEEX_MARK); }while(0)
-#define FN(N, STRE,ERR) for( int _tmp = lcc_fn_prolog(_lcc, N, strlen(N), STRE, ERR); _tmp; _tmp = lcc_fn_epilog(_lcc, STRE) )
+#define FN(N, STRE,ERR) for( int _tmp = lcc_fn_prolog(_lcc, N, strlen(N), STRE, 0, ERR, strlen(ERR)); _tmp; _tmp = lcc_fn_epilog(_lcc, STRE) )
 #define CALLI(ID)   do{ lcc_calli(_lcc, ID); }while(0)
 #define CALL(N)     do{ lcc_call(_lcc, N, strlen(N)); }while(0)
 #define RET(ID)     do{ lcc_ret(_lcc); }while(0)

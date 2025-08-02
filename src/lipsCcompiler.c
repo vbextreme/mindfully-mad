@@ -258,10 +258,12 @@ lcc_s* lcc_ret(lcc_s* rc){
 	return rc;
 }
 
-int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error){
-	lcc_fn(rc, name, len);
+int lcc_fn_prolog(lcc_s* rc, const char* name, unsigned len, unsigned store, unsigned error, const char* errorstr, unsigned errlen){
+	if( lcc_fn(rc, name, len) < 0 ) lcc_err_die(rc);
 	if( store ) lcc_node(rc, rc->currentFN);
+	if( errorstr ) error = lcc_error_add(rc,  errorstr, errlen);
 	if( error && !lcc_error(rc, error) ) lcc_err_die(rc);
+	rc->fn[rc->currentFN].iderr = error;
 	return 1;
 }
 
