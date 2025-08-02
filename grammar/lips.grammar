@@ -103,9 +103,9 @@ grammar                   : regex
 _start_                   : (skip grammar @[0])+;
 
 #semantic.anal yzer
-%[0]
+%[0];
 
-%ruledef(
+%syntax_def(
 	word(+ruleName)
 );
 
@@ -118,10 +118,6 @@ _start_                   : (skip grammar @[0])+;
     )
 );
 
-%builtin_error(
-	num(+ErrNum)
-);
-
 %grammar(
 	lips
 	|
@@ -130,31 +126,14 @@ _start_                   : (skip grammar @[0])+;
 
 %[1]
 
-%rule_primary(
+%syntax_primary(
 	word(
 		?ruleName
 		^call
 	)
 	|
-	@['unable call rule, rule is not declared']
+	@['rule is not declared']
 );
-
-%rule_binerr(
-	word(?ruleName)
-	|
-	@['required a syntax rule name']
-);
-
-
-
-
-
-
-
-
-
-
-
 
 
 

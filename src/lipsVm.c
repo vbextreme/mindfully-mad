@@ -356,7 +356,7 @@ int lips_vm_exec(lipsVM_s* vm){
 		
 		case OP_EXT:
 			switch(BYTECODE_CMD04(byc)){
-				case OPE_MATCH : return BYTECODE_VAL08(byc);
+				case OPE_MATCH : return -((int)BYTECODE_VAL08(byc));
 				case OPE_SAVE  : op_save(vm, BYTECODE_VAL08(byc)); break;
 				case OPE_RET   : return op_ret(vm, BYTECODE_VAL08(byc));
 				case OPE_NODEEX: op_node(vm, BYTECODE_VAL08(byc), 0); break;

@@ -174,6 +174,7 @@ __private void def_qspec(lcc_s* lc){
 __private void def_quantifier(lcc_s* lc){
 	INIT(lc);
 	FN("quantifier", 1, "invalid quantifier"){
+		MARK();
 		OR2(
 			CALL("qtype");
 			ZOQ(CALL("lazy"););
@@ -380,6 +381,7 @@ __private void def_syntax_flags(lcc_s* lc){
 __private void def_syntax_def(lcc_s* lc){
 	INIT(lc);
 	FN("syntax_def", 1, NULL){
+		MARK();
 		CALL("skip");
 		CALL("word");
 		CALL("syntax_flags");
@@ -408,6 +410,7 @@ __private void def_syntax_group(lcc_s* lc){
 __private void def_syntax_primary(lcc_s* lc){
 	INIT(lc);
 	FN("syntax_primary", 1, NULL){
+		MARK();
 		CHOOSE_BEGIN(4);
 		CALL("regex");
 		CHOOSE();
@@ -683,6 +686,7 @@ __private void def_grammar_end(lcc_s* lc){
 __private void def_grammar(lcc_s* lc){
 	INIT(lc);
 	FN("grammar", 1, NULL){
+		MARK();
 		CHOOSE_BEGIN(4);
 		CALL("regex");
 		CHOOSE();
@@ -706,55 +710,34 @@ __private void def_start(lcc_s* lc){
 	);
 }
 
+/**************************/
+/*** semantic.anal yzer ***/
+/**************************/
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//%rule_def(word+ruleName);
-__private void def_sem_promote_word_rulename(lcc_s* lc){
+//%syntax_def(
+//	word(+ruleName)
+//);
+__private void def_syntax_def_promote_word_rulename(lcc_s* lc){
 	INIT(lc);
 	SEMRULE();
 	NAME("ruleName");
-	ENTER("rule_def");
+	ENTER("syntax_def");
 	ENTER("word");
 	TYPE("ruleName");
 	SCOPESYMBOL();
 	SMATCH();
 }
 
-//%quantifier(qspec(lnum?('0') rnum?('1'))>qtype='?');
-__private void def_sem_change_special_quantifier(lcc_s* lc){
+//%quantifier(
+//	qspec(
+//		lnum(?'0')
+//		rnum(?'1')
+//		^qtype
+//		='?'
+//    )
+//);
+__private void def_change_special_quantifier(lcc_s* lc){
 	INIT(lc);
 	SEMRULE();
 	ENTER("quantifier");
@@ -770,64 +753,62 @@ __private void def_sem_change_special_quantifier(lcc_s* lc){
 	SMATCH();
 }
 
-//%builtin_error(num+ErrNum);
-__private void def_sem_promote_builtin_errnum(lcc_s* lc){
+//%grammar(
+//	lips
+//	|
+//	@['grammar accepted only lips rule']
+//);
+__private void def_grammar_accpet_only_lips(lcc_s* lc){
 	INIT(lc);
-	NAME("ErrNum");
 	SEMRULE();
-	ENTER("builtin_error");
-	ENTER("num");
-	TYPE("ErrNum");
-	SCOPESYMBOL();
-	SMATCH();
+	ENTER("grammar");
+	OR2(
+		ENTER("lips");
+		SMATCH();
+	,
+		ERROR(ERRADD("grammar accepted only lips rule"));
+		EMATCH();
+	);
 }
 
 //%[0];
 __private void def_semantic_stage0(lcc_s* lc){
 	INIT(lc);
 	SEMFASE();
-	def_sem_promote_word_rulename(lc);
-	def_sem_change_special_quantifier(lc);
-	def_sem_promote_builtin_errnum(lc);
+	def_syntax_def_promote_word_rulename(lc);
+	def_change_special_quantifier(lc);
+	def_grammar_accpet_only_lips(lc);
 }
 
-//%rule_primary(word?(ruleName|@[20])>call);
-__private void def_sem_promote_word_call(lcc_s* lc){
+//%syntax_primary(
+//	word(
+//		?ruleName
+//		^call
+//	)
+//	|
+//	@['unable call rule, rule is not declared']
+//);
+__private void def_promote_primary_word_as_call(lcc_s* lc){
 	INIT(lc);
+	SEMRULE();
 	NAME("call");
-	SEMRULE();
-	ENTER("rule_primary");
-	ENTER("word");
+	ENTER("syntax_primary");
 	OR2(
+		ENTER("word");
 		SYMBOL("ruleName");
-	,
-		ERROR(20);
+		TYPE("call");
 		SMATCH();
-	);
-	TYPE("call");
-	SMATCH();
-}
-
-//%rule_binerr(num?(ErrNum|@[21]));
-__private void def_sem_call_error(lcc_s* lc){
-	INIT(lc);
-	SEMRULE();
-	ENTER("rule_binerr");
-	ENTER("num");
-	OR2(
-		SYMBOL("ErrNum");
 	,
-		ERROR(21);
+		ERROR(ERRADD("rule is not declared"));
+		EMATCH();
 	);
-	SMATCH();
 }
 
 //%[1];
 __private void def_semantic_stage1(lcc_s* lc){
 	INIT(lc);
 	SEMFASE();
-	def_sem_promote_word_call(lc);
-	def_sem_call_error(lc);
+	def_promote_primary_word_as_call(lc);
 }
 
 uint16_t* lips_builtin_grammar_make(void){
@@ -894,8 +875,9 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_lips(ROBJ());
 	def_grammar_end(ROBJ());
 	def_grammar(ROBJ());
+	def_semantic_stage0(ROBJ());
+	def_semantic_stage1(ROBJ());
 	def_start(ROBJ());
-
 	uint16_t* ret;
 	MAKE(ret);
 	DTOR();

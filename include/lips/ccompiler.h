@@ -155,6 +155,7 @@ void lcc_err_die(lcc_s* lc);
 #define SCOPESYMBOL() do{ lcc_scope(_lcc, 2); } while(0)
 #define NAME(N)       do{ lcc_push_name(_lcc, N, strlen(N)); } while(0)
 #define SMATCH()      do{ lcc_match(_lcc, 0, 0); }while(0)
+#define EMATCH()      do{ lcc_match(_lcc, 0, 1); }while(0)
 #define MAKE(SET)     do{ SET = lcc_make(_lcc); if( !SET ) lcc_err_die(_lcc); }while(0)
 
 #define OR2(CMDSA, CMDSB) do{\
