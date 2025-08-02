@@ -69,7 +69,7 @@ semantic_value@['aspected quoted value']                                       :
 semantic_promote@['aspected valid node']                                       : /\^/ skip word;
 semantic_symbol@[semantic_promote]                                             : /\+/ skip word;
 semantic_senter                                                                : /\+/;
-semantic_sleave                                                                : /\-/;
+semantic_sleave                                                                : /-/;
 semantic_scope@['invalid scope']                                               : /$/ (semantic_senter|semantic_sleave);
 semantic_change@['invalid operation, aspected promotion, symbol or set value'] : semantic_promote
                                                                                | semantic_symbol
@@ -100,7 +100,7 @@ grammar                   : regex
                           | comment
                           | grammar_end
                           ;
-_start_                   : (skip grammar @[0])+;
+_start_                   : (skip grammar @[_reset_])+;
 
 #semantic.anal yzer
 %[0];
