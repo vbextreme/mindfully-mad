@@ -387,7 +387,9 @@ int lips_vm_match(lipsVM_s* vm){
 					lips_vm_semantic_reset(vm);
 					vm->pc = vm->byc->sfase[isf].addr[ia];
 					vm->ip = vm->match->ast.marked[in];
-					while( lips_vm_exec(vm) > 0 );
+					int ret;
+					while( (ret=lips_vm_exec(vm)) > 0 );
+					if( ret < 0 ) return 0;
 				}
 			}
 		}

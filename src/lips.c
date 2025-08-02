@@ -104,8 +104,9 @@ int main(int argc, char** argv){
 	mforeach(opt[OPT_s].value, it){
 		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_s].value[it].str);
 		lips_vm_reset(&vm, &m, source);
+
 		if( opt[OPT_d].set ){
-			lips_vm_debug(&vm);
+			lips_vm_match_debug(&vm);
 		}
 		else{
 			lips_vm_match(&vm);

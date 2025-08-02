@@ -519,7 +519,8 @@ __private dbgState_e debug_exec(lipsVMDebug_s* d){
 	return d->state;
 }
 
-void lips_vm_debug(lipsVM_s* vm){
+int lips_vm_match_debug(lipsVM_s* vm){
+	int ret = 0;
 	dbg_info("");
 	lipsVMDebug_s d;
 	d.txtLen = strlen((char*)vm->txt);
@@ -535,7 +536,8 @@ void lips_vm_debug(lipsVM_s* vm){
 	term_cls();
 	term_multi_surface_draw(&d.tms);
 	term_flush();
-	while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
+	while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) > 0 );
+	ret = vm->match->count;
 	if( d.brsem && d.state != DBG_STATE_QUIT ) d.state = DBG_STATE_STEP;
 	if( m_header(vm->node)->len ){
 		vm->match->ast = lips_ast_make(vm->node);
@@ -546,13 +548,20 @@ void lips_vm_debug(lipsVM_s* vm){
 					lips_vm_semantic_reset(vm);
 					vm->pc = vm->byc->sfase[isf].addr[ia];
 					vm->ip = vm->match->ast.marked[in];
-					while( debug_exec(&d) != DBG_STATE_QUIT && lips_vm_exec(d.vm) );
+					int test;
+					while( debug_exec(&d) != DBG_STATE_QUIT && (test=lips_vm_exec(d.vm))>0 );
+					if( test < 0 ) {
+						ret = 0;
+						goto BREAKOUT;
+					}
 				}
 			}
 		}
 	}
+BREAKOUT:
 	term_cls();
 	term_flush();
+	return ret;
 }
 
 void lips_dump_error(lipsVM_s* vm, lipsMatch_s* m, const utf8_t* source, FILE* f){
