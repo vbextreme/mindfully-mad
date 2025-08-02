@@ -62,7 +62,7 @@ syntax_primary                                  : regex
 syntax_repeat                                   : skip syntax_primary quantifier?;
 syntax_concat                                   : syntax_repeat+;
 syntax_altern                                   : syntax_concat ( skip /\|/ syntax_concat )*;
-syntax@['invalid syntax rule']                  : rule_def skip rule_altern rule_end;
+syntax@['invalid syntax rule']                  : syntax_def skip syntax_altern rule_end;
 
 #section.semantic
 semantic_value@['aspected quoted value']                                       : /=/ skip quoted;

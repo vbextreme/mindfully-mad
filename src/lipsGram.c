@@ -454,13 +454,13 @@ __private void def_syntax_altern(lcc_s* lc){
 	}
 }
 
-//syntax@['invalid syntax rule']                  : rule_def skip rule_altern rule_end;
+//syntax@['invalid syntax rule']                  : syntax_def skip syntax_altern rule_end;
 __private void def_syntax(lcc_s* lc){
 	INIT(lc);
 	FN("syntax", 1, "invalid syntax rule"){
-		CALL("rule_def");
+		CALL("syntax_def");
 		CALL("skip");
-		CALL("rule_altern");
+		CALL("syntax_altern");
 		CALL("rule_end");
 	}
 }
