@@ -92,6 +92,22 @@ char* load_file(const char* path){
 	return buffer;
 }
 
+uint16_t* load_byc(const char* path){
+	dbg_info("load %s", path);
+	int fd = open(path, 0, O_RDONLY);
+	if( fd == -1 ) die("error on open file %s: %m", path);
+	uint16_t* buffer = MANY(uint16_t, 4096);
+	ssize_t nr;
+	while( (nr=read(fd, &buffer[m_header(buffer)->len], m_available(buffer)*2)) > 0 ){
+		iassert(nr%2 == 0);
+		m_header(buffer)->len += nr/2;
+		buffer = m_grow(buffer, 4096);
+	}
+	if( nr < 0 ) die("error on read file %s: %m", path);
+	close(fd);
+	return buffer;
+}
+
 const char* cast_view_char(unsigned ch, int convertnumerical){
 	static char tmp[64];
 	tmp[0] = 0;

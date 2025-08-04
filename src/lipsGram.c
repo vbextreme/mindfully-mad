@@ -467,7 +467,7 @@ __private void def_syntax(lcc_s* lc){
 
 /************************/
 /*** section.semantic ***/
-/************************/
+/***********************
 
 //semantic_value@['aspected quoted value']                                       : /=/ skip quoted;
 __private void def_semantic_value(lcc_s* lc){
@@ -649,6 +649,7 @@ __private void def_semantic(lcc_s* lc){
 		CALL("rule_end");
 	}
 }
+*/
 
 /********************/
 /*** section.lips ***/
@@ -660,11 +661,11 @@ __private void def_semantic(lcc_s* lc){
 __private void def_lips(lcc_s* lc){
 	INIT(lc);
 	FN("lips", 1, "invalid lips rule"){
-		OR2(
+//		OR2(
 			CALL("syntax");
-		,
-			CALL("semantic");
-		);
+//		,
+//			CALL("semantic");
+//		);
 	}
 }
 
@@ -855,23 +856,23 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_syntax_concat(ROBJ());
 	def_syntax_altern(ROBJ());
 	def_syntax(ROBJ());
-	def_semantic_value(ROBJ());
-	def_semantic_promote(ROBJ());
-	def_semantic_symbol(ROBJ());
-	def_semantic_senter(ROBJ());
-	def_semantic_sleave(ROBJ());
-	def_semantic_scope(ROBJ());
-	def_semmantic_change(ROBJ());
-	def_semantic_query(ROBJ());
-	def_semantic_primary(ROBJ());
-	def_semantic_enter(ROBJ());
-	def_semantic_child(ROBJ());
-	def_semantic_repeat(ROBJ());
-	def_semantic_concat(ROBJ());
-	def_semantic_altern(ROBJ());
-	def_semantic_rule(ROBJ());
-	def_semantic_stage(ROBJ());
-	def_semantic(ROBJ());
+	//def_semantic_value(ROBJ());
+	//def_semantic_promote(ROBJ());
+	//def_semantic_symbol(ROBJ());
+	//def_semantic_senter(ROBJ());
+	//def_semantic_sleave(ROBJ());
+	//def_semantic_scope(ROBJ());
+	//def_semmantic_change(ROBJ());
+	//def_semantic_query(ROBJ());
+	//def_semantic_primary(ROBJ());
+	//def_semantic_enter(ROBJ());
+	//def_semantic_child(ROBJ());
+	//def_semantic_repeat(ROBJ());
+	//def_semantic_concat(ROBJ());
+	//def_semantic_altern(ROBJ());
+	//def_semantic_rule(ROBJ());
+	//def_semantic_stage(ROBJ());
+	//def_semantic(ROBJ());
 	def_lips(ROBJ());
 	def_grammar_end(ROBJ());
 	def_grammar(ROBJ());

@@ -665,7 +665,72 @@ void lips_dump_name_cenum(lipsByc_s* byc, const char* name, const char* prefix, 
 	fprintf(f, "}%s_e;\n", name);
 }
 
+__private unsigned dump_opcode(lipsByc_s* lbyc, unsigned pc, FILE* f){
+	unsigned byc = lbyc->bytecode[pc];
+	printf("%4X | ", pc);
+	switch( BYTECODE_CMD40(byc) ){
+		default : fprintf(f,"INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
+		case OP_RANGE : fprintf(f,"range %u", BYTECODE_VAL12(byc)); break;
+		case OP_URANGE: break;
+		case OP_CHAR  : fputs("char  ", f); fputs(cast_view_char(BYTECODE_VAL08(byc),1), f); break;
+		case OP_PUSH  : fprintf(f,"push  %X -> pc %X", pc + BYTECODE_IVAL11(byc), pc+1); break;
+		case OP_PUSHR : fprintf(f,"push  %X -> pc %X", pc + 1, pc + BYTECODE_IVAL11(byc)); break;
+		case OP_JMP   : fprintf(f,"jmp   %X", pc + BYTECODE_IVAL11(byc)); break;
+		case OP_NODE  : fprintf(f,"node  new::%s::%u", lbyc->name[BYTECODE_VAL12(byc)],BYTECODE_VAL12(byc)); break;
+		case OP_CALL  : fprintf(f,"call  [%u]%s -> %X",BYTECODE_VAL12(byc), lbyc->name[BYTECODE_VAL12(byc)], lbyc->fn[BYTECODE_VAL12(byc)]); break;
+		case OP_ENTER : fprintf(f,"enter %X",BYTECODE_VAL12(byc)); break;
+		case OP_TYPE  : fprintf(f,"type  %X",BYTECODE_VAL12(byc)); break;
+		case OP_SYMBOL: fprintf(f,"symbol %X",BYTECODE_VAL12(byc)); break;
+		case OP_EXT   :
+			switch(BYTECODE_CMD04(byc)){
+				case OPE_MATCH : fprintf(f,"match %u", BYTECODE_VAL08(byc)); break;
+				case OPE_SAVE  : fprintf(f,"save  %u", BYTECODE_VAL08(byc)); break;
+				case OPE_RET   : fprintf(f,"ret   %u", BYTECODE_VAL08(byc)); break;
+				case OPE_NODEEX:
+					switch( BYTECODE_VAL08(byc) ){
+						case OPEV_NODEEX_PARENT : fprintf(f,"node  parent"); break;
+						case OPEV_NODEEX_DISABLE: fprintf(f,"node  disable"); break;
+						case OPEV_NODEEX_ENABLE : fprintf(f,"node  enable"); break;
+						case OPEV_NODEEX_MARK   : fprintf(f,"node  mark"); break;
+					}
+				break;
+				case OPE_LEAVE: fprintf(f,"leave"); break;
+				case OPE_VALUE:{
+					unsigned len;
+					uint32_t next;
+					const char* str = lipsByc_extract_string(lbyc->bytecode, pc, &next, &len);
+					switch(BYTECODE_VAL08(byc)){
+						default: fprintf(f,"INTERNAL ERROR OPEV_VALUE CMD08 0x%X", BYTECODE_VAL08(byc)); break;
+						case OPEV_VALUE_SET : fprintf(f,"value set, '%s'", str);  break;
+						case OPEV_VALUE_TEST: fprintf(f,"value test, '%s'", str); break;
+					}
+					fputc('\n', f);
+					return next-pc;
+				}
+				case OPE_SCOPE:
+					switch(BYTECODE_VAL08(byc)){
+						default: fprintf(f,"INTERNAL ERROR OPEV_VALUE CMD08 0x%X", BYTECODE_VAL08(byc)); break;
+						case OPEV_SCOPE_NEW   : fprintf(f,"scope new"); break;
+						case OPEV_SCOPE_LEAVE : fprintf(f,"scope leave"); break;
+						case OPEV_SCOPE_SYMBOL: fprintf(f,"scope symbol"); break;
+					}
+				break;
+				case OPE_ERROR: fprintf(f,"error %u", BYTECODE_VAL08(byc)); break;
+				default: fprintf(f,"INTERNAL ERROR CMD04: 0x%X", BYTECODE_CMD04(byc)); break;
+			}
+		break;
+	}
+	fputc('\n', f);
+	return 1;
+}
 
+void lips_objdump(lipsByc_s* byc, FILE* f){
+	unsigned epc = byc->sectionCode+byc->codeLen;
+	unsigned pc = byc->sectionCode;
+	while( pc < epc ){
+		pc += dump_opcode(byc, pc, f);
+	}
+}
 
 
 

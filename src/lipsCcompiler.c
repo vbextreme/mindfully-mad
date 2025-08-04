@@ -410,22 +410,34 @@ lcc_s* lcc_scope(lcc_s* rc, unsigned nls){
 
 uint16_t* lcc_make(lcc_s* rc){
 	if( rc->err ) return NULL;
-	
-	unsigned totalheader = BYC_HEADER_SIZE +
-		m_header(rc->range)->len * 16 +
-		m_header(rc->fn)->len
-	;
+	unsigned totalheader = BYC_HEADER_SIZE;
+	dbg_info("aspected start section fn: %u", totalheader);
+	totalheader += m_header(rc->fn)->len;
+	dbg_info("aspected start section name: %u", totalheader);
 	mforeach(rc->fn, i){
-		unsigned len = strlen(rc->fn[i].name);
+		unsigned len = strlen(rc->fn[i].name)+1;
 		len = ROUND_UP(len, 2);
-		totalheader += len;
+		totalheader += len/2;
 	}
+	mforeach(rc->name, i){
+		unsigned len = strlen(rc->name[i])+1;
+		len = ROUND_UP(len, 2);
+		totalheader += len/2;
+	}
+	dbg_info("aspected start section error: %u", totalheader);
 	mforeach(rc->errstr, i){
-		unsigned len = strlen(rc->errstr[i]);
+		unsigned len = strlen(rc->errstr[i])+1;
 		len = ROUND_UP(len, 2);
-		totalheader += len;
+		totalheader += len/2;
 	}
-	
+	dbg_info("aspected start section range: %u", totalheader);
+	totalheader += m_header(rc->range)->len * 16;
+	dbg_info("aspected start section semantic: %u", totalheader);
+	mforeach(rc->sfase, i){
+		totalheader += m_header(rc->sfase[i].addr)->len + 1;
+	}
+	dbg_info("aspected start section code: %u", totalheader);
+	//fn 17 name 61 error 286 range 459 semantic 619 code 625
 	if( rc->label[0].address >= 65536 ){
 		rc->err     = LCC_ERR_LBL_LONG;
 		rc->errid   = 0;
@@ -434,7 +446,9 @@ uint16_t* lcc_make(lcc_s* rc){
 	}
 	
 	unsigned totalbc = totalheader + m_header(rc->bytecode)->len;
+	dbg_info("total:%u header: %u", totalbc, totalheader);
 	uint16_t* bc = MANY(uint16_t, totalbc);
+	m_header(bc)->len = totalbc;
 	bc[BYC_FORMAT]       = BYTECODE_FORMAT;
 	bc[BYC_FLAGS]        = 0;
 	bc[BYC_RANGE_COUNT]  = m_header(rc->range)->len;
@@ -442,11 +456,22 @@ uint16_t* lcc_make(lcc_s* rc){
 	bc[BYC_FN_COUNT]     = m_header(rc->fn)->len;
 	bc[BYC_NAME_COUNT]   = m_header(rc->name)->len + bc[BYC_FN_COUNT];
 	bc[BYC_ERR_COUNT]    = m_header(rc->errstr)->len;
-	bc[BYC_START]        = rc->label[0].address;
+	bc[BYC_START]        = rc->label[0].address+totalheader;
 	bc[BYC_CODELEN]      = m_header(rc->bytecode)->len;
-	uint16_t* inc = &bc[BYC_HEADER_SIZE];
+	dbg_info("rangeCount:%u urangeCount:%u fnCount:%u nameCount:%u errCount:%u start:%u codelen:%u", 
+		bc[BYC_RANGE_COUNT],
+		bc[BYC_URANGE_COUNT],
+		bc[BYC_FN_COUNT],
+		bc[BYC_NAME_COUNT],
+		bc[BYC_ERR_COUNT],
+		bc[BYC_START],
+		bc[BYC_CODELEN]
+	);
+
+	unsigned inc = BYC_HEADER_SIZE;
 	//.section fn
-	bc[BYC_SECTION_FN] = inc - bc;
+	bc[BYC_SECTION_FN] = inc;
+	dbg_info("bc[BYC_SECTION_FN] = %u", inc);
 	mforeach(rc->fn, i){
 		if( rc->fn[i].addr > UINT16_MAX ){
 			rc->err     = LCC_ERR_FN_LONG;
@@ -455,48 +480,58 @@ uint16_t* lcc_make(lcc_s* rc){
 			m_free(bc);
 			return NULL;
 		}
-		*inc++ = rc->fn[i].addr;
+		dbg_info("bc[%u] = %u", inc, rc->fn[i].addr+totalheader);
+		bc[inc++] = rc->fn[i].addr+totalheader;
 	}
 	//.section name
-	bc[BYC_SECTION_NAME] = inc - bc;
+	bc[BYC_SECTION_NAME] = inc;
+	dbg_info("bc[BYC_SECTION_NAME] = %u", inc);
 	mforeach(rc->fn, i){
 		unsigned len = strlen(rc->fn[i].name)+1;
-		memcpy(inc, rc->fn[i].name, len);
+		memcpy(&bc[inc], rc->fn[i].name, len);
 		len = ROUND_UP(len, 2);
-		len /= 2;
-		inc += len;
+		dbg_info("bc[%u] = %s", inc, (char*)&bc[inc]);
+		inc += len/2;
 	}
 	mforeach(rc->name, i){
 		unsigned len = strlen(rc->name[i])+1;
-		memcpy(inc, rc->name[i], len);
+		memcpy(&bc[inc], rc->name[i], len);
 		len = ROUND_UP(len, 2);
-		len /= 2;
-		inc += len;
+		dbg_info("bc[%u] = %s", inc, (char*)&bc[inc]);
+		inc += len/2;
 	}
 	//.section err
-	bc[BYC_SECTION_ERROR] = inc - bc;
+	bc[BYC_SECTION_ERROR] = inc;
+	dbg_info("bc[BYC_SECTION_ERROR] = %u", inc);
 	mforeach(rc->errstr, i){
 		unsigned len = strlen(rc->errstr[i])+1;
-		memcpy(inc, rc->errstr[i], len);
+		memcpy(&bc[inc], rc->errstr[i], len);
 		len = ROUND_UP(len, 2);
-		len /= 2;
-		inc += len;
+		dbg_info("bc[%u] = %s", inc, (char*)&bc[inc]);
+		inc += len/2;
 	}
 	//.section range
-	bc[BYC_SECTION_RANGE] = inc - bc;
+	bc[BYC_SECTION_RANGE] = inc;
+	dbg_info("bc[BYC_SECTION_RANGE] = %u", inc);
 	mforeach(rc->range, i){
-		memcpy(inc, rc->range[i].map, sizeof rc->range[i].map);
+		memcpy(&bc[inc], rc->range[i].map, sizeof rc->range[i].map);
+		dbg_info("bc[%u] = new range", inc);
 		inc += (sizeof rc->range[i].map)/2;
 	}
 	//.section urange
-	bc[BYC_SECTION_URANGE] = inc - bc;
+	bc[BYC_SECTION_URANGE] = inc;
+	dbg_info("bc[BYC_SECTION_URANGE] = %u", inc);
 	//.section semantic
-	bc[BYC_SECTION_SEMANTIC] = inc-bc;
-	bc[BYC_SEMANTIC_COUNT] = m_header(rc->sfase)->len;
+	bc[BYC_SECTION_SEMANTIC] = inc;
+	dbg_info("bc[BYC_SECTION_SEMANTIC] = %u", inc);
+	bc[BYC_SEMANTIC_COUNT]   = m_header(rc->sfase)->len;
+	dbg_info("bc[BYC_SEMANTIC_COUNT] = %u", bc[BYC_SEMANTIC_COUNT]);
 	mforeach(rc->sfase, i){
-		*inc++ = m_header(rc->sfase[i].addr)->len;
+		dbg_info("bc[%u] = %u", inc,  m_header(rc->sfase[i].addr)->len);
+		bc[inc++] = m_header(rc->sfase[i].addr)->len;
 		mforeach(rc->sfase[i].addr, j){
-			*inc++ = rc->sfase[i].addr[j];
+			dbg_info("bc[%u] = %u", inc,  rc->sfase[i].addr[j]);
+			bc[inc++] = rc->sfase[i].addr[j] + totalheader;
 		}
 	}
 	//linker
@@ -535,8 +570,11 @@ uint16_t* lcc_make(lcc_s* rc){
 		rc->bytecode[rc->call[it].addr] |= ifn & 0x0FFF;
 	}
 	//.section code
-	bc[BYC_SECTION_CODE] = inc - bc;
-	memcpy(inc, rc->bytecode, m_header(rc->bytecode)->len*sizeof(uint16_t));
+	bc[BYC_SECTION_CODE] = inc;
+	dbg_info("bc[BYC_SECTION_CODE] = %u", inc);
+	dbg_info("total %u", inc+bc[BYC_CODELEN]);
+	iassert(inc+bc[BYC_CODELEN] <= totalbc);
+	memcpy(&bc[inc], rc->bytecode, bc[BYC_CODELEN]*sizeof(uint16_t));
 	return bc;
 }
 
@@ -553,7 +591,7 @@ const char* lcc_err_str(lcc_s* lc, char info[4096]){
 		case LCC_ERR_FN_LONG        : sprintf(info, "fn %s long jump, address 0x%lX > 65536", lc->fn[lc->errid].name, lc->erraddr); break;
 		case LCC_ERR_FN_MANY        : sprintf(info, "declared too many fn, > 4096"); break;
 		case LCC_ERR_FN_NOTEXISTS   : sprintf(info, "fn %lu not exists", lc->errid); break;
-		case LCC_ERR_FN_UNDECLARED  : sprintf(info, "undeclared fn '%s'", lc->fn[lc->errid].name); break;
+		case LCC_ERR_FN_UNDECLARED  : sprintf(info, "undeclared fn '%s'", lc->call[lc->errid].name); break;
 		case LCC_ERR_ERR_OVERFLOW   : sprintf(info, "undeclared error %lu", lc->errid); break;
 		case LCC_ERR_UNKNOWN_NODE   : sprintf(info, "undeclared node '%.*s'", (int)lc->errid, lc->erstr); break;
 	}
@@ -569,9 +607,13 @@ void lcc_err_die(lcc_s* lc){
 	);
 }
 
-
-
-
+lccfn_s* lcc_get_function_byname(lcc_s* lc, const char* name, unsigned len){
+	mforeach(lc->fn, i){
+		const unsigned n = strlen(lc->fn->name);
+		if( n == len && !memcmp(lc->fn->name, name, n) ) return &lc->fn[i];
+	}
+	return NULL;
+}
 
 
 

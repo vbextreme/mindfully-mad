@@ -1,0 +1,97 @@
+# LIPS MINIMAL GRAMMAR
+
+#section.generic
+num@['invalid number']                 : /[0-9]+/;
+comment-                               : skip /#[^\n]*\n/;
+sep-                                   : /[ \t\n]+/;
+skip-                                  : /[ \t\n]* /;
+rule_end-@['required ; at end of rule']: skip /;/;
+quoted@['invalid quoted string']       : /'(?:[^\\']|\\.)*'/;
+word                                   : /[a-zA-Z_][a-zA-Z_0-9]* /;
+
+#section error
+errdef@['invalid error definition']: /@\[/ (word|quoted) /\]/;
+
+#section.quantifier
+lnum                             : num;
+rnum                             : num;
+lazy                             : /\?/;
+qtype                            : /[\*\+\?]/;
+qspec                            : /\{/ lnum (/,/ rnum?)? /\}/;
+quantifier@['invalid quantifier']: qtype lazy?
+                                 | qspec
+                                 ;
+
+#section.regex
+rx_literal                    : /[^\|\*\+\?\(\)\{\}\[\]\.\/\\]/;
+rx_escaped                    : /\\[\|\*\+\?\(\)\{\}\[\]\.\^\$\\0\/tn]/;
+rx_char@['invalid char']      : rx_escaped
+                              | rx_literal
+                              ;
+rx_range                      : rx_char (/-/ rx_char)?;
+rx_class_rev                  : /\^/;
+rx_class@['invalid range']    : /\[/ rx_class_rev? rx_range+ /\]/;
+rx_begin                      : /\^/;
+rx_end                        : /\$/;
+rx_any                        : /./;
+rx_unnamed                    : /\?:/;
+rx_group@['invalid group']    : /\(/ rx_unnamed? rx_altern /\)/;
+rx_primary@['invalid primary']: rx_literal
+                              | rx_escaped
+                              | rx_group
+                              | rx_class
+                              | rx_any
+                              ;
+rx_repeat                     : rx_primary quantifier?;
+rx_concat                     : rx_repeat+;
+rx_altern                     : rx_concat ( /\|/ rx_concat )*;
+regex@['invalid regex']       : /\// rx_begin? rx_altern rx_end? /\//;
+
+#section.syntax
+syntax_unstore                                  : /-/;
+syntax_match                                    : /!/;
+syntax_start@['aspected syntax rule definition']: /:/;
+syntax_flags@['invalid syntax flag']            : syntax_unstore? syntax_match? errdef?;
+syntax_def                                      : skip word syntax_flags skip syntax_start;
+syntax_group@['invalid group']                  : /\(/ skip syntax_altern skip /\)/;
+syntax_primary                                  : regex
+                                                | syntax_group
+                                                | errdef
+                                                | word
+                                                ;
+syntax_repeat                                   : skip syntax_primary quantifier?;
+syntax_concat                                   : syntax_repeat+;
+syntax_altern                                   : syntax_concat ( skip /\|/ syntax_concat )*;
+syntax@['invalid syntax rule']                  : syntax_def skip syntax_altern rule_end;
+
+#section.lips
+lips@['invalid lips rule']: syntax ;
+grammar_end-!             : skip /\0/;
+grammar                   : regex
+                          | lips
+                          | comment
+                          | grammar_end
+                          ;
+_start_                   : (skip grammar @[_reset_])+;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

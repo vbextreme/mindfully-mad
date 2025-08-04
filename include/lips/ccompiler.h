@@ -106,6 +106,7 @@ lcc_s* lcc_symbol(lcc_s* rc, const char* name, unsigned len);
 lcc_s* lcc_scope(lcc_s* rc, unsigned nls);
 const char* lcc_err_str(lcc_s* lc, char info[4096]);
 void lcc_err_die(lcc_s* lc);
+lccfn_s* lcc_get_function_byname(lcc_s* lc, const char* name, unsigned len);
 
 #define CTOR()      lcc_s _lccobj; lcc_ctor(&_lccobj)
 #define INIT(R)     lcc_s* _lcc = (R)

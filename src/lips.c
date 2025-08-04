@@ -17,22 +17,24 @@ typedef enum{
 	OPT_dump_ast_split,
 	OPT_dot_png,
 	OPT_dump_name_cenum,
-	OPT_builin_lips_emitter,
+	OPT_builtin_lips_emitter,
+	OPT_builtin_lips_objdump,
 	OPT_h
 }options_e;
 
 option_s opt[] = {
-	{ 'g', "--grammar"       , "grammar file"                                           ,              OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ 's', "--source"        , "source file"                                            ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ 'd', "--debug"         , "debug"                                                  ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dump-capture"  , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-file" , "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-dot"  , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-split", "dump ast splitted on first multi child"                 ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dot-png"       , "auto build dot file to png"                             ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dump-name-enum", "dump grammar name to C enum"                            ,                           OPT_PATH, 0, NULL},
-	{'\0', "--builtin-lips-emitter", "build lips in bytecode"                            ,                           OPT_PATH, 0, NULL},
-	{ 'h', "--help"          , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
+	{ 'g', "--grammar"             , "grammar file"                                           ,              OPT_PATH | OPT_EXISTS, 0, NULL},
+	{ 's', "--source"              , "source file"                                            ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
+	{ 'd', "--debug"               , "debug"                                                  ,                          OPT_NOARG, 0, NULL},
+	{'\0', "--dump-capture"        , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-file"       , "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-dot"        , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
+	{'\0', "--dump-ast-split"      , "dump ast splitted on first multi child"                 ,                          OPT_NOARG, 0, NULL},
+	{'\0', "--dot-png"             , "auto build dot file to png"                             ,                          OPT_NOARG, 0, NULL},
+	{'\0', "--dump-name-enum"      , "dump grammar name to C enum"                            ,                           OPT_PATH, 0, NULL},
+	{'\0', "--builtin-lips-emitter", "build lips in bytecode"                                 ,                           OPT_PATH, 0, NULL},
+	{'\0', "--builtin-lips-objdump", "dump previous builded grammar"                          ,              OPT_EXISTS | OPT_PATH, 0, NULL},
+	{ 'h', "--help"                , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
 
 __private FILE* argfopen(long id, const char* path, const char* mode){
@@ -63,6 +65,15 @@ int main(int argc, char** argv){
 		argv_usage(opt, argv[0]);
 		return 0;
 	}
+	
+	if( opt[OPT_builtin_lips_objdump].set ){
+		__free uint16_t* gb = load_byc(opt[OPT_builtin_lips_objdump].value->str);
+		lipsByc_s lbyc;
+		if( !lipsByc_ctor(&lbyc, gb) ) return 1;
+		lips_objdump(&lbyc, stdout);
+		return 0;
+	}
+	
 	if( !opt[OPT_s].set ) die("required argument --source");
 	
 	if( opt[OPT_dump_capture].set && m_header(opt[OPT_dump_capture].value)->len != m_header(opt[OPT_s].value)->len ){
@@ -75,13 +86,14 @@ int main(int argc, char** argv){
 		die("for dump ast need pass many file same many source have passed, for example -s A,B --dump-ast-dot cA,cB");
 	}
 	
+	
+
 	uint16_t* lgram = lips_builtin_grammar_make();
 	if( !lgram ) die("internal error, wrong builtin lips grammar");
 	lipsByc_s lbyc;
 	lipsByc_ctor(&lbyc, lgram);
 	lipsVM_s vm;
 	lips_vm_ctor(&vm, &lbyc);
-	
 	if( opt[OPT_g].set ){
 		lipsMatch_s m;
 		lips_match_ctor(&m);
@@ -96,7 +108,7 @@ int main(int argc, char** argv){
 		lips_vm_dtor(&vm);
 		lips_match_dtor(&m);
 		lipsByc_ctor(&lbyc, lgram);
-		lips_vm_ctor(&vm, &lbyc);
+		lips_vm_ctor(&vm, &lbyc);	
 	}
 
 	lipsMatch_s m;
@@ -162,10 +174,10 @@ int main(int argc, char** argv){
 				lips_dump_name_cenum(&lbyc, "grammarName", "LGRAM", out);
 				argfclose(out);
 			}
-			if( opt[OPT_builin_lips_emitter].set ){
-				FILE* out = argfopen(-1, opt[OPT_builin_lips_emitter].value->str, "w");
-				//uint16_t* b = lips_builtin_emitter(&lbyc, m.ast.root);
-				//if( b ) fwrite(b, sizeof(uint16_t), m_header(b)->len, out);
+			if( opt[OPT_builtin_lips_emitter].set ){
+				FILE* out = argfopen(-1, opt[OPT_builtin_lips_emitter].value->str, "w");
+				uint16_t* b = lips_builtin_emitter(&lbyc, m.ast.root);
+				if( b ) fwrite(b, sizeof(uint16_t), m_header(b)->len, out);
 				argfclose(out);
 			}
 		}

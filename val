@@ -4,5 +4,6 @@ ninja clean
 ninja 
 
 valgrind --undef-value-errors=no --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=no --trace-syscalls=no --show-leak-kinds=definite,indirect,possible\
-	./lips -s ../grammar/lips.grammar --dump-name-enum ../src/lipsGrammarNameEnum.h --dump-ast-dot lips.dot --dump-ast-split --dot-png
+	./lips -s ../grammar/lips.minimal.grammar --builtin-lips-emitter ./lips.minimal.byc
+	#./lips -s ../grammar/lips.grammar --dump-name-enum ../src/lipsGrammarNameEnum.h --dump-ast-dot lips.dot --dump-ast-split --dot-png
 

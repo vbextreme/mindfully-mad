@@ -3,11 +3,12 @@
 __private const char** map_name(const uint16_t* section, const unsigned count){
 	const char** ret = MANY(const char*, count);
 	m_header(ret)->len = count;
+	const char* n = (const char*) section;
 	for( unsigned i = 0; i < count; ++i ){
-		ret[i] = (const char*)section;
-		unsigned len = strlen(ret[i])+1;
-		len = ROUND_UP(len, 2);
-		section += len/2;
+		ret[i] = n;
+		const unsigned len = strlen(ret[i])+1;
+		n += ROUND_UP(len, 2);
+		dbg_info("[%u] '%s'", i, ret[i]);
 	}
 	return ret;
 }
@@ -29,7 +30,7 @@ __private lipsSFase_s* map_semantic(const uint16_t* section, const unsigned coun
 const char* lipsByc_extract_string(uint16_t* byc, uint32_t offset, uint32_t* next, unsigned* len){
 	char* str = (char*)&byc[offset];
 	*len = strlen(str);
-	*next = ROUND_UP(*len, 2) / 2;
+	*next = offset+ROUND_UP(*len+1, 2) / 2;
 	return str;
 }
 
@@ -37,7 +38,7 @@ lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode){
 	dbg_info("");
 	byc->format = bytecode[BYC_FORMAT];
 	if( byc->format != BYTECODE_FORMAT ){
-		dbg_error("wrong bytecode format");
+		dbg_error("wrong bytecode format, aspected %X but is %X", BYTECODE_FORMAT, bytecode[BYC_FORMAT]);
 		return NULL;
 	}
 	byc->bytecode        = bytecode;
@@ -57,13 +58,38 @@ lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode){
 	byc->sectionURange   = bytecode[BYC_SECTION_URANGE];
 	byc->sectionSemantic = bytecode[BYC_SECTION_SEMANTIC];
 	byc->sectionCode     = bytecode[BYC_SECTION_CODE];
+	
+	dbg_info("flags:%X rangeCount:%u urange:%u fn:%u name:%u err:%u semantic:%u start:%u codelen:%u",
+		byc->flags,
+		byc->rangeCount,
+		byc->urangeCount,
+		byc->fnCount,
+		byc->nameCount,
+		byc->errCount,
+		byc->semanticCount,
+		byc->start,
+		byc->codeLen
+	);
+	dbg_info("sections:: fn:%u name:%u error:%u range:%u urange:%u semantic:%u code:%u",
+		byc->sectionFn,
+		byc->sectionName,
+		byc->sectionError,
+		byc->sectionRange,
+		byc->sectionURange,
+		byc->sectionSemantic,
+		byc->sectionCode
+	);
 	byc->fn              = &bytecode[byc->sectionFn];
 	byc->range           = &bytecode[byc->sectionRange];
 	byc->urange          = &bytecode[byc->sectionURange];
 	byc->code            = &bytecode[byc->sectionCode];
+	dbg_info("map name");
 	byc->name            = map_name(&bytecode[byc->sectionName], byc->nameCount);
+	dbg_info("map error");
 	byc->errStr          = map_name(&bytecode[byc->sectionError], byc->errCount);
+	dbg_info("map semantic");
 	byc->sfase           = map_semantic(&bytecode[byc->sectionSemantic], byc->semanticCount);
+	dbg_info("load completed");
 	return byc;
 }
 

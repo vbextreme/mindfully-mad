@@ -35,6 +35,7 @@ unsigned count_tab(const char* begin, const char* end);
 void display_signal(size_t offset);
 void error_show(unsigned errnum, const char* errstr, const char* errdesc, const char* begin, size_t len, size_t erroff);
 char* load_file(const char* path);
+uint16_t* load_byc(const char* path);
 const char* cast_view_char(unsigned ch, int convertnumerical);
 void term_cls(void);
 void term_gotoxy(unsigned x, unsigned y);
