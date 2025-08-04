@@ -18,6 +18,7 @@ typedef enum{
 	OPT_dot_png,
 	OPT_dump_name_cenum,
 	OPT_builtin_lips_emitter,
+	OPT_emitter_ccode,
 	OPT_builtin_lips_objdump,
 	OPT_h
 }options_e;
@@ -33,6 +34,7 @@ option_s opt[] = {
 	{'\0', "--dot-png"             , "auto build dot file to png"                             ,                          OPT_NOARG, 0, NULL},
 	{'\0', "--dump-name-enum"      , "dump grammar name to C enum"                            ,                           OPT_PATH, 0, NULL},
 	{'\0', "--builtin-lips-emitter", "build lips in bytecode"                                 ,                           OPT_PATH, 0, NULL},
+	{'\0', "--emitter-ccode"       , "save emitter as c code, argument is var name"           ,                            OPT_STR, 0, NULL},
 	{'\0', "--builtin-lips-objdump", "dump previous builded grammar"                          ,              OPT_EXISTS | OPT_PATH, 0, NULL},
 	{ 'h', "--help"                , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
@@ -67,7 +69,8 @@ int main(int argc, char** argv){
 	}
 	
 	if( opt[OPT_builtin_lips_objdump].set ){
-		__free uint16_t* gb = load_byc(opt[OPT_builtin_lips_objdump].value->str);
+		__free uint16_t* gb = lipsByc_load_binary(opt[OPT_builtin_lips_objdump].value->str);
+		if( !gb ) die("error on load file '%s': %m", opt[OPT_builtin_lips_objdump].value->str);
 		lipsByc_s lbyc;
 		if( !lipsByc_ctor(&lbyc, gb) ) return 1;
 		lips_objdump(&lbyc, stdout);
@@ -86,8 +89,6 @@ int main(int argc, char** argv){
 		die("for dump ast need pass many file same many source have passed, for example -s A,B --dump-ast-dot cA,cB");
 	}
 	
-	
-
 	uint16_t* lgram = lips_builtin_grammar_make();
 	if( !lgram ) die("internal error, wrong builtin lips grammar");
 	lipsByc_s lbyc;
@@ -175,10 +176,9 @@ int main(int argc, char** argv){
 				argfclose(out);
 			}
 			if( opt[OPT_builtin_lips_emitter].set ){
-				FILE* out = argfopen(-1, opt[OPT_builtin_lips_emitter].value->str, "w");
 				uint16_t* b = lips_builtin_emitter(&lbyc, m.ast.root);
-				if( b ) fwrite(b, sizeof(uint16_t), m_header(b)->len, out);
-				argfclose(out);
+				if( opt[OPT_emitter_ccode].set ) lipsByc_save_ccode(b, opt[OPT_emitter_ccode].value->str, opt[OPT_builtin_lips_emitter].value->str);
+				else if( lipsByc_save_binary(b, opt[OPT_builtin_lips_emitter].value->str) < 0 ) die("error on save file '%s': %m", opt[OPT_builtin_lips_objdump].value->str);
 			}
 		}
 	}

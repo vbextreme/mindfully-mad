@@ -1,4 +1,6 @@
 #include <lips/bytecode.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 __private const char** map_name(const uint16_t* section, const unsigned count){
 	const char** ret = MANY(const char*, count);
@@ -107,6 +109,67 @@ long lipsByc_name_toid(lipsByc_s* byc, const char* name){
 		if( !strcmp(byc->name[i], name) ) return i;
 	}
 	return -1;
+}
+
+int lipsByc_save_binary(uint16_t* bytecode, const char* fname){
+	int fd = -1;
+	if( !strcmp(fname, "stdout") ){
+		fd = 1;
+	}
+	else if( !strcmp(fname, "stderr") ){
+		fd = 2;
+	}
+	else{
+		fd = open(fname, O_WRONLY | O_CREAT, 0600);
+	}
+	if( fd < 0 ) return -1;
+	if( write(fd, bytecode, bytecode[BYC_SECTION_CODE]+bytecode[BYC_CODELEN] * sizeof(uint16_t)) < 0 ){
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
+uint16_t* lipsByc_load_binary(const char* path){
+	dbg_info("load %s", path);
+	int fd = open(path, 0, O_RDONLY);
+	if( fd == -1 ) return NULL;
+	uint16_t* buffer = MANY(uint16_t, 4096);
+	ssize_t nr;
+	while( (nr=read(fd, &buffer[m_header(buffer)->len], m_available(buffer)*2)) > 0 ){
+		iassert(nr%2 == 0);
+		m_header(buffer)->len += nr/2;
+		buffer = m_grow(buffer, 4096);
+	}
+	if( nr < 0 ){
+		m_free(buffer);
+		return NULL;
+	}
+	close(fd);
+	return buffer;
+}
+
+int lipsByc_save_ccode(uint16_t* bytecode, const char* varname, const char* fname){
+	int fd = -1;
+	if( !strcmp(fname, "stdout") ){
+		fd = 1;
+	}
+	else if( !strcmp(fname, "stderr") ){
+		fd = 2;
+	}
+	else{
+		fd = open(fname, O_WRONLY | O_CREAT, 0600);
+	}
+	if( fd < 0 ) return -1;
+	const unsigned bytecodelen = bytecode[BYC_CODELEN]+bytecode[BYC_SECTION_CODE];
+	dprintf(fd, "uint16_t %s[] = {\n", varname);
+	for( unsigned i = 0; i < bytecodelen; ++i ){
+		dprintf(fd, "\t[0x%X] = 0x%X,\n", i, bytecode[i]);
+	}
+	dprintf(fd, "};\n");
+	close(fd);
+	return 0;
 }
 
 

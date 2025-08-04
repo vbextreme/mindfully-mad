@@ -108,6 +108,8 @@ const char* lipsByc_extract_string(uint16_t* byc, uint32_t offset, uint32_t* nex
 lipsByc_s* lipsByc_ctor(lipsByc_s* byc, uint16_t* bytecode);
 void lipsByc_dtor(lipsByc_s* byc);
 long lipsByc_name_toid(lipsByc_s* byc, const char* name);
-
+int lipsByc_save_binary(uint16_t* bytecode, const char* fname);
+uint16_t* lipsByc_load_binary(const char* path);
+int lipsByc_save_ccode(uint16_t* bytecode, const char* varname, const char* fname);
 
 #endif
