@@ -666,8 +666,7 @@ void lips_dump_name_cenum(lipsByc_s* byc, const char* name, const char* prefix, 
 }
 
 __private unsigned dump_opcode(lipsByc_s* lbyc, unsigned pc, FILE* f){
-	unsigned byc = lbyc->bytecode[pc];
-	printf("%4X | ", pc);
+	unsigned byc = lbyc->code[pc];
 	switch( BYTECODE_CMD40(byc) ){
 		default : fprintf(f,"INTERNAL ERROR CMD40: 0x%X", BYTECODE_CMD40(byc)); break;
 		case OP_RANGE : fprintf(f,"range %u", BYTECODE_VAL12(byc)); break;
@@ -724,10 +723,33 @@ __private unsigned dump_opcode(lipsByc_s* lbyc, unsigned pc, FILE* f){
 	return 1;
 }
 
+__private void objdump_info(lipsByc_s* byc, unsigned pc, unsigned maxfname, FILE* f){
+	fprintf(f, "%4X | ", pc);
+	unsigned nw = 0;
+	if( pc == byc->start ){
+		nw = fprintf(f, "_start_:");
+	}
+	else{
+		for(unsigned i = 0; i < byc->fnCount; ++i){
+			if( byc->fn[i] == pc ){
+				nw = fprintf(f, "%s:", byc->name[i]);
+				break;
+			}
+		}
+	}
+	for( unsigned i = nw; i < maxfname; ++i ) fputc(' ', f);
+}
+
 void lips_objdump(lipsByc_s* byc, FILE* f){
-	unsigned epc = byc->sectionCode+byc->codeLen;
-	unsigned pc = byc->sectionCode;
+	unsigned maxfname = 0;
+	mforeach(byc->name, i){
+		if( strlen(byc->name[i]) > maxfname ) maxfname = strlen(byc->name[i]);
+	}
+	maxfname += 2;
+	unsigned epc = byc->codeLen;
+	unsigned pc = 0;
 	while( pc < epc ){
+		objdump_info(byc, pc, maxfname, f);
 		pc += dump_opcode(byc, pc, f);
 	}
 }

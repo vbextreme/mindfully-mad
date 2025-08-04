@@ -456,7 +456,7 @@ uint16_t* lcc_make(lcc_s* rc){
 	bc[BYC_FN_COUNT]     = m_header(rc->fn)->len;
 	bc[BYC_NAME_COUNT]   = m_header(rc->name)->len + bc[BYC_FN_COUNT];
 	bc[BYC_ERR_COUNT]    = m_header(rc->errstr)->len;
-	bc[BYC_START]        = rc->label[0].address+totalheader;
+	bc[BYC_START]        = rc->label[0].address;
 	bc[BYC_CODELEN]      = m_header(rc->bytecode)->len;
 	dbg_info("rangeCount:%u urangeCount:%u fnCount:%u nameCount:%u errCount:%u start:%u codelen:%u", 
 		bc[BYC_RANGE_COUNT],
@@ -480,8 +480,8 @@ uint16_t* lcc_make(lcc_s* rc){
 			m_free(bc);
 			return NULL;
 		}
-		dbg_info("bc[%u] = %u", inc, rc->fn[i].addr+totalheader);
-		bc[inc++] = rc->fn[i].addr+totalheader;
+		dbg_info("bc[%u] = %u", inc, rc->fn[i].addr);
+		bc[inc++] = rc->fn[i].addr;
 	}
 	//.section name
 	bc[BYC_SECTION_NAME] = inc;
