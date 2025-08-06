@@ -648,7 +648,6 @@ __private void ast_dump_dot(lipsAst_s* ast, const char** nmap, FILE* f){
 }
 
 void lips_dump_ast(lipsVM_s* vm, lipsAst_s* root, FILE* f, int mode){
-	dbg_info("dump %p", root);
 	if( !root ) return;
 	switch( mode ){
 		case 0: ast_dump_file(root, vm->byc->name, 0, f); break;

@@ -2,13 +2,12 @@
 #include <notstd/str.h>
 #include <fcntl.h>
 #include <inutility.h>
-#include <lips/vm.h>
-#include <lips/builtingram.h>
-#include <lips/bytecode.h>
-#include <lips/debug.h>
+#include <lips/lips.h>
+
+//CONTROLLARE GLI ESCAPED CHAR IN BUILD
 
 typedef enum{
-	OPT_g,
+	OPT_m,
 	OPT_s,
 	OPT_d,
 	OPT_dump_capture,
@@ -17,24 +16,24 @@ typedef enum{
 	OPT_dump_ast_split,
 	OPT_dot_png,
 	OPT_dump_name_cenum,
-	OPT_builtin_lips_emitter,
-	OPT_emitter_ccode,
+	OPT_save_regex,
+	OPT_ccode,
 	OPT_builtin_lips_objdump,
 	OPT_h
 }options_e;
 
 option_s opt[] = {
-	{ 'g', "--grammar"             , "grammar file"                                           ,              OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ 's', "--source"              , "source file"                                            ,  OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
-	{ 'd', "--debug"               , "debug"                                                  ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dump-capture"        , "dump capture to file, pass stdout for write on terminal",                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-file"       , "dump ast to file, pass stdout for write on terminal"    ,                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-dot"        , "dump ast in dot format to a file"                       ,                           OPT_PATH, 0, NULL},
-	{'\0', "--dump-ast-split"      , "dump ast splitted on first multi child"                 ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dot-png"             , "auto build dot file to png"                             ,                          OPT_NOARG, 0, NULL},
-	{'\0', "--dump-name-enum"      , "dump grammar name to C enum"                            ,                           OPT_PATH, 0, NULL},
-	{'\0', "--builtin-lips-emitter", "build lips in bytecode"                                 ,                           OPT_PATH, 0, NULL},
-	{'\0', "--emitter-ccode"       , "save emitter as c code, argument is var name"           ,                            OPT_STR, 0, NULL},
+	{ 'm', "--regex-minimal"       , "use internal regex minimal, only for developer"         , OPT_NOARG                        , 0, NULL},
+	{ 's', "--source"              , "source file"                                            , OPT_ARRAY | OPT_PATH | OPT_EXISTS, 0, NULL},
+	{ 'd', "--debug"               , "debug"                                                  , OPT_NOARG                        , 0, NULL},
+	{'\0', "--dump-capture"        , "dump capture to file, pass stdout for write on terminal", OPT_PATH                         , 0, NULL},
+	{'\0', "--dump-ast-file"       , "dump ast to file, pass stdout for write on terminal"    , OPT_PATH                         , 0, NULL},
+	{'\0', "--dump-ast-dot"        , "dump ast in dot format to a file"                       , OPT_PATH                         , 0, NULL},
+	{'\0', "--dump-ast-split"      , "dump ast splitted on first multi child"                 , OPT_NOARG                        , 0, NULL},
+	{'\0', "--dot-png"             , "auto build dot file to png"                             , OPT_NOARG                        , 0, NULL},
+	{'\0', "--dump-name-cenum"     , "dump grammar name to C enum"                            , OPT_PATH                         , 0, NULL},
+	{'\0', "--save-regex"          , "save builded regex"                                     , OPT_PATH                         , 0, NULL},
+	{'\0', "--ccode"               , "save emitter as c code, argument is var name"           , OPT_STR                          , 0, NULL},
 	{'\0', "--builtin-lips-objdump", "dump previous builded grammar"                          ,              OPT_EXISTS | OPT_PATH, 0, NULL},
 	{ 'h', "--help"                , "display this"                                           ,                OPT_NOARG | OPT_END, 0, NULL},
 };
@@ -77,6 +76,14 @@ int main(int argc, char** argv){
 		return 0;
 	}
 	
+	lips_s lips;
+	if( opt[OPT_m].set ){
+		lips_ctor_minimal(&lips);
+	}
+	else{
+		lips_ctor(&lips);
+	}
+	
 	if( !opt[OPT_s].set ) die("required argument --source");
 	
 	if( opt[OPT_dump_capture].set && m_header(opt[OPT_dump_capture].value)->len != m_header(opt[OPT_s].value)->len ){
@@ -89,68 +96,55 @@ int main(int argc, char** argv){
 		die("for dump ast need pass many file same many source have passed, for example -s A,B --dump-ast-dot cA,cB");
 	}
 	
-	uint16_t* lgram = lips_builtin_grammar_make();
-	if( !lgram ) die("internal error, wrong builtin lips grammar");
-	lipsByc_s lbyc;
-	lipsByc_ctor(&lbyc, lgram);
-	lipsVM_s vm;
-	lips_vm_ctor(&vm, &lbyc);
-	if( opt[OPT_g].set ){
-		lipsMatch_s m;
-		lips_match_ctor(&m);
-		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_g].value->str);
-		lips_vm_reset(&vm, &m, source);
-		if( lips_vm_match(&vm) < 1 ){
-			lips_dump_error(&vm, &m, source, stderr);
-			die("");
-		}
-		die("TODO extract new grammar");
-		lipsByc_dtor(&lbyc);
-		lips_vm_dtor(&vm);
-		lips_match_dtor(&m);
-		lipsByc_ctor(&lbyc, lgram);
-		lips_vm_ctor(&vm, &lbyc);	
-	}
-
-	lipsMatch_s m;
-	lips_match_ctor(&m);
 	mforeach(opt[OPT_s].value, it){
 		__free utf8_t* source = (utf8_t*)load_file(opt[OPT_s].value[it].str);
-		lips_vm_reset(&vm, &m, source);
-
+		__free uint16_t* rxbyc = NULL;
 		if( opt[OPT_d].set ){
-			lips_vm_match_debug(&vm);
+			if( opt[OPT_m].set ){
+				rxbyc = lips_regex_minimal_dbg(&lips, source);
+			}
+			else{
+				rxbyc = lips_regex_minimal_dbg(&lips, source);
+				//die("unable to build non minimal regex");
+			}
 		}
 		else{
-			lips_vm_match(&vm);
+			if( opt[OPT_m].set ){
+				rxbyc = lips_regex_minimal(&lips, source);
+			}
+			else{
+				rxbyc = lips_regex_minimal(&lips, source);	
+				//die("unable to build non minimal regex");
+			}
 		}
-		if( m.count < 1 ){
-			lips_dump_error(&vm, &m, vm.txt, stderr);
+		if( !rxbyc ){
+			lips_dump_error(&lips.vm, &lips.match, lips.vm.txt, stderr);
 			return 0;
 		}
+
 		if( opt[OPT_dump_capture].set ){
 			FILE* out = argfopen(-1, opt[OPT_dump_capture].value[it].str, "w");
-			lips_dump_capture(&m, out);
+			lips_dump_capture(&lips.match, out);
 			argfclose(out);
 		}
 		
-		if( m.ast.root ){
-			lipsAst_s* root = m.ast.root;
+		if( lips.match.ast.root ){
+			lipsAst_s* root = lips.match.ast.root;
 			if( opt[OPT_dump_ast_split].set ){
 				while( m_header(root->child)->len == 1 ) root = root->child[0];
-				if( m_header(root->child)->len == 0 ) root = m.ast.root;
+				if( m_header(root->child)->len == 0 ) root = lips.match.ast.root;
 			}
 			if( opt[OPT_dump_ast_file].set ){
 				if( opt[OPT_dump_ast_split].set ){
 					mforeach(root->child, i){
 						FILE* out = argfopen(i, opt[OPT_dump_ast_file].value[it].str, "w");
-						lips_dump_ast(&vm, root->child[i], out, 0);
+						lips_dump_ast(&lips.vm, root->child[i], out, 0);
 						argfclose(out);
 					}
 				}
 				else{
 					FILE* out = argfopen(-1, opt[OPT_dump_ast_file].value[it].str, "w");
-					lips_dump_ast(&vm, m.ast.root, out, 0);
+					lips_dump_ast(&lips.vm, lips.match.ast.root, out, 0);
 					argfclose(out);
 				}
 			}
@@ -158,34 +152,31 @@ int main(int argc, char** argv){
 				if( opt[OPT_dump_ast_split].set ){
 					mforeach(root->child, i){
 						FILE* out = argfopen(i, opt[OPT_dump_ast_dot].value[it].str, "w");
-						lips_dump_ast(&vm, root->child[i], out, 1);
+						lips_dump_ast(&lips.vm, root->child[i], out, 1);
 						argfclose(out);
 						if( opt[OPT_dot_png].set ) dotbuild(i, opt[OPT_dump_ast_dot].value[it].str);
 					}
 				}
 				else{
 					FILE* out = argfopen(-1, opt[OPT_dump_ast_dot].value[it].str, "w");
-					lips_dump_ast(&vm, m.ast.root, out, 1);
+					lips_dump_ast(&lips.vm, lips.match.ast.root, out, 1);
 					argfclose(out);
 					if( opt[OPT_dot_png].set ) dotbuild(-1, opt[OPT_dump_ast_dot].value[it].str);
 				}
 			}
 			if( opt[OPT_dump_name_cenum].set ){
 				FILE* out = argfopen(-1, opt[OPT_dump_name_cenum].value->str, "w");
-				lips_dump_name_cenum(&lbyc, "grammarName", "LGRAM", out);
+				lips_dump_name_cenum(&lips.byc, "grammarName", "LGRAM", out);
 				argfclose(out);
 			}
-			if( opt[OPT_builtin_lips_emitter].set ){
-				uint16_t* b = lips_builtin_emitter(&lbyc, m.ast.root);
-				if( opt[OPT_emitter_ccode].set ) lipsByc_save_ccode(b, opt[OPT_emitter_ccode].value->str, opt[OPT_builtin_lips_emitter].value->str);
-				else if( lipsByc_save_binary(b, opt[OPT_builtin_lips_emitter].value->str) < 0 ) die("error on save file '%s': %m", opt[OPT_builtin_lips_objdump].value->str);
+			if( opt[OPT_save_regex].set ){
+				if( opt[OPT_ccode].set ) lipsByc_save_ccode(rxbyc, opt[OPT_ccode].value->str, opt[OPT_save_regex].value->str);
+				else if( lipsByc_save_binary(rxbyc, opt[OPT_save_regex].value->str) < 0 ) die("error on save file '%s': %m", opt[OPT_save_regex].value->str);
 			}
 		}
 	}
 	
-	lips_vm_dtor(&vm);
-	lips_match_dtor(&m);
-	lipsByc_dtor(&lbyc);
+	lips_dtor(&lips);
 	return 0;
 }
 

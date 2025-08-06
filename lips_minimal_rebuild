@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cd build 
+ninja
+./lips -ms ../grammar/lips.minimal.grammar --save-regex ../src/lips_hardcoded.h --ccode HARDCODED_BYTECODE --dump-ast-split --dump-ast-dot lips.dot --dot-png
+rm ./*.lips.dot
+

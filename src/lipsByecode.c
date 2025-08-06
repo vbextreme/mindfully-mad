@@ -120,7 +120,7 @@ int lipsByc_save_binary(uint16_t* bytecode, const char* fname){
 		fd = 2;
 	}
 	else{
-		fd = open(fname, O_WRONLY | O_CREAT, 0600);
+		fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0600);
 	}
 	if( fd < 0 ) return -1;
 	if( write(fd, bytecode, bytecode[BYC_SECTION_CODE]+bytecode[BYC_CODELEN] * sizeof(uint16_t)) < 0 ){
@@ -159,7 +159,7 @@ int lipsByc_save_ccode(uint16_t* bytecode, const char* varname, const char* fnam
 		fd = 2;
 	}
 	else{
-		fd = open(fname, O_WRONLY | O_CREAT, 0600);
+		fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0600);
 	}
 	if( fd < 0 ) return -1;
 	const unsigned bytecodelen = bytecode[BYC_CODELEN]+bytecode[BYC_SECTION_CODE];

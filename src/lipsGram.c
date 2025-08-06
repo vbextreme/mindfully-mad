@@ -174,7 +174,6 @@ __private void def_qspec(lcc_s* lc){
 __private void def_quantifier(lcc_s* lc){
 	INIT(lc);
 	FN("quantifier", 1, "invalid quantifier"){
-		MARK();
 		OR2(
 			CALL("qtype");
 			ZOQ(CALL("lazy"););
@@ -197,7 +196,7 @@ __private void def_rx_literal(lcc_s* lc){
 __private void def_rx_escaped(lcc_s* lc){
 	INIT(lc);
 	USERANGE();
-	RRSTR("|*+?(){}[].^$\\0/tn", 0);
+	RRSTR("|*+?(){}[].^$\\/tn0", 0);
 	unsigned ir = RRADD();
 	FN("rx_escaped", 1, NULL){
 		CHAR('\\');
@@ -293,10 +292,8 @@ __private void def_rx_group(lcc_s* lc){
 __private void def_rx_primary(lcc_s* lc){
 	INIT(lc);
 	FN("rx_primary", 1, "invalid primary"){
-		CHOOSE_BEGIN(5);
-			CALL("rx_literal");
-		CHOOSE();
-			CALL("rx_escaped");
+		CHOOSE_BEGIN(4);
+			CALL("rx_char");
 		CHOOSE();
 			CALL("rx_group");
 		CHOOSE();
@@ -381,7 +378,6 @@ __private void def_syntax_flags(lcc_s* lc){
 __private void def_syntax_def(lcc_s* lc){
 	INIT(lc);
 	FN("syntax_def", 1, NULL){
-		MARK();
 		CALL("skip");
 		CALL("word");
 		CALL("syntax_flags");
@@ -410,7 +406,6 @@ __private void def_syntax_group(lcc_s* lc){
 __private void def_syntax_primary(lcc_s* lc){
 	INIT(lc);
 	FN("syntax_primary", 1, NULL){
-		MARK();
 		CHOOSE_BEGIN(4);
 		CALL("regex");
 		CHOOSE();
@@ -465,192 +460,6 @@ __private void def_syntax(lcc_s* lc){
 	}
 }
 
-/************************/
-/*** section.semantic ***/
-/***********************
-
-//semantic_value@['aspected quoted value']                                       : /=/ skip quoted;
-__private void def_semantic_value(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_value", 1, "aspected quoted value"){
-		CHAR('=');
-		CALL("skip");
-		CALL("quoted");
-	}
-}
-
-//semantic_promote@['aspected valid node']                                       : /\^/ skip word;
-__private void def_semantic_promote(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_promote", 1, "aspected valid node"){
-		CHAR('^');
-		CALL("skip");
-		CALL("word");
-	}
-}
-
-//semantic_symbol@[semantic_promote]                                             : /\+/ skip word;
-__private void def_semantic_symbol(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_symbol", 1, "aspected valid node"){
-		CHAR('+');
-		CALL("skip");
-		CALL("word");
-	}
-}
-
-//semantic_senter                                                                : /\+/;
-__private void def_semantic_senter(lcc_s* lc){
-	token_char(lc, "semantic_senter", "+", 1, NULL);
-}
-
-//semantic_sleave                                                                : /\-/;
-__private void def_semantic_sleave(lcc_s* lc){
-	token_char(lc, "semantic_sleave", "+", 1, NULL);
-}
-
-//semantic_scope@['invalid scope']                                               : /$/ (semantic_senter|semantic_sleave);
-__private void def_semantic_scope(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_scope", 1, "invalid scope"){
-		CHAR('$');
-		OR2(
-			CALL("semantic_senter");
-		,
-			CALL("semantic_sleave");
-		);
-	}
-}
-
-//semantic_change@['invalid operation, aspected promotion, symbol or set value'] : semantic_promote
-//                                                                               | semantic_symbol
-//                                                                               | semantic_value
-//                                                                               ;
-__private void def_semmantic_change(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_change", 1, "invalid operation, aspected promotion, symbol or set value"){
-		CHOOSE_BEGIN(3);
-		CALL("semantic_promote");
-		CHOOSE();
-		CALL("semantic_symbol");
-		CHOOSE();
-		CALL("semantic_value");
-		CHOOSE_END();
-	}
-}
-
-//semantic_query@['invalid query']                                               : /\?/ skip (word | quoted);
-__private void def_semantic_query(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_query", 1, "invalid query"){
-		CHAR('?');
-		CALL("skip");
-		OR2(
-			CALL("word");
-		,
-			CALL("quoted");
-		);
-	}
-}
-
-//semantic_primary                                                               : semantic_change
-//                                                                               | semantic_query
-//                                                                               | semantic_altern
-//                                                                               ;
-__private void def_semantic_primary(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_primary", 1, NULL){
-		OR3(
-			CALL("semantic_change");
-		,
-			CALL("semantic_query");
-		,
-			CALL("semantic_altern");
-		);
-	}
-}
-
-//semantic_enter                                                                 : skip /\(/ skip semantic_primary skip /\)/ skip;
-__private void def_semantic_enter(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_enter", 1, NULL){
-		CALL("skip");
-		CHAR('(');
-		CALL("skip");
-		CALL("semantic_primary");
-		CALL("skip");
-		CHAR(')');
-		CALL("skip");
-	}
-}
-
-//semantic_child@['invalid child']                                               : skip word semantic_enter?;
-__private void def_semantic_child(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_child", 1, "invalid child"){
-		CALL("skip");
-		CALL("word");
-		ZOQ(CALL("semantic_enter"););
-	}
-}
-
-//semantic_repeat                                                                : semantic_child
-__private void def_semantic_repeat(lcc_s* lc){
-	token_replace(lc, "semantic_child", "semantic_repeat", NULL);
-}
-
-//semantic_concat                                                                : semantic_repeat+;
-__private void def_semantic_concat(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_concat", 1, NULL){
-		OMQ(CALL("semantic_repeat"););
-	}
-}
-
-//semantic_altern                                                                : semantic_concat ( skip /\|/ semantic_concat )*;
-__private void def_semantic_altern(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_altern", 1, NULL){
-		CALL("semantic_concat");
-		ZOQ(
-			CALL("skip");
-			CHAR('|');
-			CALL("semantic_concat");
-		);
-	}
-}
-
-//semantic_rule                                                                  : skip word semantic_enter;
-__private void def_semantic_rule(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_rule", 1, NULL){
-		CALL("skip");
-		CALL("word");
-		CALL("semantic_enter");
-	}
-}
-
-//semantic_stage                                                                 : /\[/ num /\]/;
-__private void def_semantic_stage(lcc_s* lc){
-	INIT(lc);
-	FN("semantic_stage", 1, NULL){
-		CHAR('[');
-		CALL("num");
-		CHAR(']');
-	}
-}
-
-//semantic@['invalid semantic rule']                                             : /%/ ( semantic_stage | semantic_rule ) rule_end;
-__private void def_semantic(lcc_s* lc){
-	INIT(lc);
-	FN("semantic", 1, "invalid semantic rule"){
-		CHAR('%');
-		OR2( CALL("semantic_stage");, CALL("semantic_rule"); );
-		CALL("rule_end");
-	}
-}
-*/
-
 /********************/
 /*** section.lips ***/
 /********************/
@@ -687,7 +496,6 @@ __private void def_grammar_end(lcc_s* lc){
 __private void def_grammar(lcc_s* lc){
 	INIT(lc);
 	FN("grammar", 1, NULL){
-		MARK();
 		CHOOSE_BEGIN(4);
 		CALL("regex");
 		CHOOSE();
@@ -709,107 +517,6 @@ __private void def_start(lcc_s* lc){
 		CALL("grammar");
 		ERROR(0);
 	);
-}
-
-/**************************/
-/*** semantic.anal yzer ***/
-/**************************/
-
-
-//%syntax_def(
-//	word(+ruleName)
-//);
-__private void def_syntax_def_promote_word_rulename(lcc_s* lc){
-	INIT(lc);
-	SEMRULE();
-	NAME("ruleName");
-	ENTER("syntax_def");
-	ENTER("word");
-	TYPE("ruleName");
-	SCOPESYMBOL();
-	SMATCH();
-}
-
-//%quantifier(
-//	qspec(
-//		lnum(?'0')
-//		rnum(?'1')
-//		^qtype
-//		='?'
-//    )
-//);
-__private void def_change_special_quantifier(lcc_s* lc){
-	INIT(lc);
-	SEMRULE();
-	ENTER("quantifier");
-	ENTER("qspec");
-	ENTER("lnum");
-	VALUET("0");
-	LEAVE();
-	ENTER("rnum");
-	VALUET("1");
-	LEAVE();
-	TYPE("qtype");
-	VALUES("?");
-	SMATCH();
-}
-
-//%grammar(
-//	lips
-//	|
-//	@['grammar accepted only lips rule']
-//);
-__private void def_grammar_accpet_only_lips(lcc_s* lc){
-	INIT(lc);
-	SEMRULE();
-	ENTER("grammar");
-	OR2(
-		ENTER("lips");
-		SMATCH();
-	,
-		ERROR(ERRADD("grammar accepted only lips rule"));
-		EMATCH();
-	);
-}
-
-//%[0];
-__private void def_semantic_stage0(lcc_s* lc){
-	INIT(lc);
-	SEMFASE();
-	def_syntax_def_promote_word_rulename(lc);
-	def_change_special_quantifier(lc);
-	def_grammar_accpet_only_lips(lc);
-}
-
-//%syntax_primary(
-//	word(
-//		?ruleName
-//		^call
-//	)
-//	|
-//	@['unable call rule, rule is not declared']
-//);
-__private void def_promote_primary_word_as_call(lcc_s* lc){
-	INIT(lc);
-	SEMRULE();
-	NAME("call");
-	ENTER("syntax_primary");
-	OR2(
-		ENTER("word");
-		SYMBOL("ruleName");
-		TYPE("call");
-		SMATCH();
-	,
-		ERROR(ERRADD("rule is not declared"));
-		EMATCH();
-	);
-}
-
-//%[1];
-__private void def_semantic_stage1(lcc_s* lc){
-	INIT(lc);
-	SEMFASE();
-	def_promote_primary_word_as_call(lc);
 }
 
 uint16_t* lips_builtin_grammar_make(void){
@@ -856,28 +563,9 @@ uint16_t* lips_builtin_grammar_make(void){
 	def_syntax_concat(ROBJ());
 	def_syntax_altern(ROBJ());
 	def_syntax(ROBJ());
-	//def_semantic_value(ROBJ());
-	//def_semantic_promote(ROBJ());
-	//def_semantic_symbol(ROBJ());
-	//def_semantic_senter(ROBJ());
-	//def_semantic_sleave(ROBJ());
-	//def_semantic_scope(ROBJ());
-	//def_semmantic_change(ROBJ());
-	//def_semantic_query(ROBJ());
-	//def_semantic_primary(ROBJ());
-	//def_semantic_enter(ROBJ());
-	//def_semantic_child(ROBJ());
-	//def_semantic_repeat(ROBJ());
-	//def_semantic_concat(ROBJ());
-	//def_semantic_altern(ROBJ());
-	//def_semantic_rule(ROBJ());
-	//def_semantic_stage(ROBJ());
-	//def_semantic(ROBJ());
 	def_lips(ROBJ());
 	def_grammar_end(ROBJ());
 	def_grammar(ROBJ());
-	def_semantic_stage0(ROBJ());
-	def_semantic_stage1(ROBJ());
 	def_start(ROBJ());
 	uint16_t* ret;
 	MAKE(ret);

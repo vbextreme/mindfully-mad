@@ -70,6 +70,7 @@ src += [ 'src/lipsDebug.c' ]
 src += [ 'src/lipsCcompiler.c' ]
 src += [ 'src/lipsGram.c' ]
 src += [ 'src/lipsBuiltinEmit.c' ]
+src += [ 'src/liblips.c' ]
 src += [ 'src/lips.c' ]
 
 ##############

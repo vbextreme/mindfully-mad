@@ -1,6 +1,7 @@
 #include <lips/bytecode.h>
 #include <lips/ast.h>
 #include <lips/ccompiler.h>
+#include "inutility.h"
 #include "lipsGrammarNameEnum.h"
 
 typedef struct emit{
@@ -47,16 +48,16 @@ __private void choose_token_emit(emit_s* e, lipsAst_s* n, emit_f fn, unsigned id
 		unsigned lblnext = lcc_label_new(&e->lc);
 		lcc_split(&e->lc, lblnext);
 		fn(e, get_token_or_die(e, n, 0, id));
-		for(unsigned i = 0; i < count-1; ++i){
+		for(unsigned i = 1; i < count-1; ++i){
 			lcc_jmp(&e->lc, lblend);
 			lcc_label(&e->lc, lblnext);
 			lblnext = lcc_label_new(&e->lc);
 			lcc_split(&e->lc, lblnext);
-			fn(e, get_token_or_die(e, n, 0, id));
+			fn(e, get_token_or_die(e, n, i, id));
 		}
 		lcc_jmp(&e->lc, lblend);
 		lcc_label(&e->lc, lblnext);
-		fn(e, get_token_or_die(e, n, 0, id));
+		fn(e, get_token_or_die(e, n, count-1, id));
 		lcc_label(&e->lc, lblend);
 	}
 	else{
@@ -109,44 +110,48 @@ __private quantifier_e get_quantifier(emit_s* e, lipsAst_s* n, int* lazy, unsign
 }
 
 __private void quantifier_emit(emit_s* e, lipsAst_s* n, emit_f fn, unsigned id){
-	dbg_info("");
 	int lazy;
 	unsigned m, M;
 	quantifier_e qt = get_quantifier(e, n, &lazy, &m, &M);
-	unsigned lbl, lend;
+	dbg_info("%c islazy:%u m:%u M:%u", 
+		qt == QT_ZO ? '?' : qt == QT_ZM ? '*' : qt == QT_OM ? '+' : qt == QT_SPEC ? '{' : qt == QT_NONE ? '!' : 'E',
+		lazy, m, M
+	);
+
+	unsigned L1, L2;
 	switch( qt ){
 		default: die("emit: quantifier type internal error, this never append");
 		case QT_ZO:
-			lbl = lcc_label_new(&e->lc);
+			L2 = lcc_label_new(&e->lc);
 			if( lazy ) 
-				lcc_splir(&e->lc, lbl);
+				lcc_splir(&e->lc, L2);
 			else
-				lcc_split(&e->lc, lbl);
+				lcc_split(&e->lc, L2);
 			fn(e, get_token_or_die(e, n, 0, id));
-			lcc_label(&e->lc, lbl);
+			lcc_label(&e->lc, L2);
 		break;
 		
 		case QT_ZM:
-			lend = lcc_label_new(&e->lc);
-			lbl = lcc_label_new(&e->lc);
-			lcc_label(&e->lc, lbl);
+			L1 = lcc_label_new(&e->lc);
+			L2 = lcc_label_new(&e->lc);
+			lcc_label(&e->lc, L1);
 			if( lazy ) 
-				lcc_splir(&e->lc, lbl);
+				lcc_splir(&e->lc, L2);
 			else
-				lcc_split(&e->lc, lbl);
+				lcc_split(&e->lc, L2);
 			fn(e, get_token_or_die(e, n, 0, id));
-			lcc_jmp(&e->lc, lbl);
-			lcc_label(&e->lc, lend);
+			lcc_jmp(&e->lc, L1);
+			lcc_label(&e->lc, L2);
 		break;
 		
 		case QT_OM:
-			lbl = lcc_label_new(&e->lc);
-			lcc_label(&e->lc, lbl);
+			L1 = lcc_label_new(&e->lc);
+			lcc_label(&e->lc, L1);
 			fn(e, get_token_or_die(e, n, 0, id));
 			if( lazy ) 
-				lcc_split(&e->lc, lbl);
+				lcc_split(&e->lc, L1);
 			else
-				lcc_splir(&e->lc, lbl);
+				lcc_splir(&e->lc, L1);
 		break;
 		
 		case QT_SPEC:
@@ -155,6 +160,26 @@ __private void quantifier_emit(emit_s* e, lipsAst_s* n, emit_f fn, unsigned id){
 		
 		case QT_NONE: fn(e, get_token_or_die(e, n, 0, id)); break;
 	}
+}
+
+__private unsigned unescape_char(lipsAst_s* n){
+	n = n->child[0];
+	unsigned r = 0;
+	switch( n->id ){
+		case LGRAM_rx_literal: r = *n->tp; break;
+		case LGRAM_rx_escaped:
+			iassert(n->len == 2);
+			switch( n->tp[1] ){
+				case 'n': r = '\n';     break;
+				case 't': r = '\t';     break;
+				case '0': r = 0;        break;
+				default : r = n->tp[1]; break;
+			}
+		break;
+		default: die("emit: rx_class wrong child, unaspected %u", n->id);
+	}
+	dbg_info("char '%s'", cast_view_char(r, 1));
+	return r;
 }
 
 __private unsigned emit_deferr(emit_s* e, lipsAst_s* n){
@@ -231,9 +256,20 @@ __private void emit_rx_class(emit_s* e, lipsAst_s* n){
 	}
 	for( unsigned i = start; i < count; ++i ){
 		lipsAst_s* range = get_token_or_die(e, n, i, LGRAM_rx_range);
+		unsigned re;
 		switch( m_header(range->child)->len ){
-			case 1: lcc_range_set(&r, *range->child[0]->tp); break;
-			case 2: for( unsigned j = *range->child[0]->tp; j <= *range->child[1]->tp; ++j ) lcc_range_set(&r, j); break;
+			case 1:
+				lcc_range_set(&r, 
+					unescape_char(
+						get_token_or_die(e, range, 0, LGRAM_rx_char)
+					)
+				);
+			break;
+			case 2:
+				re = unescape_char(get_token_or_die(e, range, 1, LGRAM_rx_char));
+				for( unsigned j = unescape_char(get_token_or_die(e, range, 0, LGRAM_rx_char)); j <= re; ++j )
+					lcc_range_set(&r, j); 
+			break;
 			default: die("emit: rx_range wrong child number:: 0 > %u < 3", m_header(range->child)->len);
 		}
 	}
@@ -264,8 +300,7 @@ __private void emit_rx_primary(emit_s* e, lipsAst_s* n){
 	n = n->child[0];
 	switch( n->id ){
 		default              : die("emit: unknow rule %s as child of rx_primary", e->byc->name[n->id]);
-		case LGRAM_rx_literal: lcc_char(&e->lc, *n->tp); break;
-		case LGRAM_rx_escaped: lcc_char(&e->lc, *n->tp); break;
+		case LGRAM_rx_char   : lcc_char(&e->lc, unescape_char(n)); break;
 		case LGRAM_rx_any    : lcc_range(&e->lc, 0); break;
 		case LGRAM_rx_class  : emit_rx_class(e, n); break;
 		case LGRAM_rx_group  : emit_rx_group(e, n); break;
@@ -308,6 +343,7 @@ __private void emit_syntax_primary(emit_s* e, lipsAst_s* n){
 }
 
 __private void emit_syntax_repeat(emit_s* e, lipsAst_s* n){
+	dbg_info("");
 	quantifier_emit(e, n, emit_syntax_primary, LGRAM_syntax_primary);
 }
 
@@ -349,7 +385,7 @@ __private void emit_lips(emit_s* e, lipsAst_s* n){
 
 __private void emit_grammar(emit_s* e, lipsAst_s* n){
 	mforeach(n->child, i){
-		dbg_info("emit ast[%u]", i);
+		dbg_warning("emit ast[%u]", i);
 		iassert(n->child[i]->id == LGRAM_grammar);
 		lipsAst_s* g = n->child[i];
 		mforeach( g->child, j ){
